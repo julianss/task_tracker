@@ -2,28 +2,97 @@
 
 set -euo pipefail
 
-APP_NAME="${APP_NAME:-task-tracker}"
-APP_USER="${APP_USER:-${SUDO_USER:-$USER}}"
-APP_GROUP="${APP_GROUP:-$APP_USER}"
+prompt_with_default() {
+  local __var_name="$1"
+  local prompt_label="$2"
+  local default_value="$3"
+  local input=""
+
+  if [[ -t 0 && -t 1 ]]; then
+    read -r -p "${prompt_label} [${default_value}]: " input
+  fi
+
+  if [[ -z "${input}" ]]; then
+    printf -v "${__var_name}" '%s' "${default_value}"
+  else
+    printf -v "${__var_name}" '%s' "${input}"
+  fi
+}
+
+prompt_secret_with_default() {
+  local __var_name="$1"
+  local prompt_label="$2"
+  local default_value="$3"
+  local input=""
+
+  if [[ -t 0 && -t 1 ]]; then
+    read -r -s -p "${prompt_label} [hidden]: " input
+    echo
+  fi
+
+  if [[ -z "${input}" ]]; then
+    printf -v "${__var_name}" '%s' "${default_value}"
+  else
+    printf -v "${__var_name}" '%s' "${input}"
+  fi
+}
+
+normalize_base_path() {
+  local value="${1:-/}"
+  if [[ -z "${value}" || "${value}" == "/" ]]; then
+    printf '/'
+    return
+  fi
+  if [[ "${value}" != /* ]]; then
+    value="/${value}"
+  fi
+  value="${value%/}"
+  printf '%s' "${value:-/}"
+}
+
+validate_port() {
+  local value="$1"
+  [[ "${value}" =~ ^[0-9]+$ ]] || return 1
+  (( value >= 1 && value <= 65535 ))
+}
+
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-APP_PORT="${APP_PORT:-18000}"
-APP_BASE_PATH_RAW="${APP_BASE_PATH:-/tasks}"
-APP_BASE_PATH="${APP_BASE_PATH_RAW%/}"
-APP_BASE_PATH="${APP_BASE_PATH:-/}"
-SERVICE_NAME="${SERVICE_NAME:-${APP_NAME}.service}"
-SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}"
-APACHE_CONF_NAME="${APACHE_CONF_NAME:-${APP_NAME}.conf}"
-APACHE_CONF_PATH="/etc/apache2/conf-available/${APACHE_CONF_NAME}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 NODE_BIN="${NODE_BIN:-node}"
 NPM_BIN="${NPM_BIN:-npm}"
-VENV_DIR="${VENV_DIR:-${APP_DIR}/.venv}"
-ENV_FILE="${ENV_FILE:-/etc/${APP_NAME}.env}"
 
-if [[ "${APP_BASE_PATH}" != /* ]]; then
-  echo "APP_BASE_PATH must start with '/'. Current value: ${APP_BASE_PATH}" >&2
+APP_NAME_DEFAULT="${APP_NAME:-task-tracker}"
+APP_USER_DEFAULT="${APP_USER:-${SUDO_USER:-$USER}}"
+APP_GROUP_DEFAULT="${APP_GROUP:-${APP_GROUP:-${APP_USER_DEFAULT}}}"
+APP_PORT_DEFAULT="${APP_PORT:-18000}"
+APP_BASE_PATH_DEFAULT="$(normalize_base_path "${APP_BASE_PATH:-/tasks}")"
+SECRET_KEY_DEFAULT="${SECRET_KEY:-change-me-in-/etc/${APP_NAME_DEFAULT}.env}"
+
+prompt_with_default APP_NAME "Application name" "${APP_NAME_DEFAULT}"
+prompt_with_default APP_USER "System user for the service" "${APP_USER_DEFAULT}"
+prompt_with_default APP_GROUP "System group for the service" "${APP_GROUP_DEFAULT}"
+prompt_with_default APP_PORT "Local bind port" "${APP_PORT_DEFAULT}"
+prompt_with_default APP_BASE_PATH "Public app path" "${APP_BASE_PATH_DEFAULT}"
+
+APP_BASE_PATH="$(normalize_base_path "${APP_BASE_PATH}")"
+if ! validate_port "${APP_PORT}"; then
+  echo "APP_PORT must be a number between 1 and 65535. Current value: ${APP_PORT}" >&2
   exit 1
 fi
+
+SERVICE_NAME_DEFAULT="${SERVICE_NAME:-${APP_NAME}.service}"
+APACHE_CONF_NAME_DEFAULT="${APACHE_CONF_NAME:-${APP_NAME}.conf}"
+ENV_FILE_DEFAULT="${ENV_FILE:-/etc/${APP_NAME}.env}"
+VENV_DIR_DEFAULT="${VENV_DIR:-${APP_DIR}/.venv}"
+
+prompt_with_default SERVICE_NAME "systemd service name" "${SERVICE_NAME_DEFAULT}"
+prompt_with_default APACHE_CONF_NAME "Apache config name" "${APACHE_CONF_NAME_DEFAULT}"
+prompt_with_default ENV_FILE "Environment file" "${ENV_FILE_DEFAULT}"
+prompt_with_default VENV_DIR "Virtualenv path" "${VENV_DIR_DEFAULT}"
+prompt_secret_with_default SECRET_KEY "SECRET_KEY for Flask sessions" "${SECRET_KEY_DEFAULT}"
+
+SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}"
+APACHE_CONF_PATH="/etc/apache2/conf-available/${APACHE_CONF_NAME}"
 
 if ! command -v sudo >/dev/null 2>&1; then
   echo "sudo is required for systemd and Apache configuration." >&2
@@ -50,6 +119,11 @@ if [[ ! -f "${APP_DIR}/backend/app.py" || ! -f "${APP_DIR}/package.json" ]]; the
   exit 1
 fi
 
+if [[ "${APP_BASE_PATH}" != /* ]]; then
+  echo "APP_BASE_PATH must start with '/'. Current value: ${APP_BASE_PATH}" >&2
+  exit 1
+fi
+
 echo "Deploying ${APP_NAME}"
 echo "  app dir: ${APP_DIR}"
 echo "  app user: ${APP_USER}:${APP_GROUP}"
@@ -71,12 +145,13 @@ else
   "$NPM_BIN" install --prefix "${APP_DIR}"
 fi
 
+echo "Building frontend bundle"
 TASK_TRACKER_BASE_PATH="${APP_BASE_PATH}" "$NPM_BIN" run build --prefix "${APP_DIR}"
 
 sudo tee "${ENV_FILE}" >/dev/null <<EOF
 APP_PORT=${APP_PORT}
 APP_BASE_PATH=${APP_BASE_PATH}
-SECRET_KEY=${SECRET_KEY:-change-me-in-${ENV_FILE}}
+SECRET_KEY=${SECRET_KEY}
 EOF
 sudo chmod 0640 "${ENV_FILE}"
 sudo chown root:"${APP_GROUP}" "${ENV_FILE}" || true

@@ -17,13 +17,14 @@ Use `./scripts/deploy.sh` on the server. The script:
 
 - creates or updates `.venv`
 - installs Python dependencies including `gunicorn`
-- installs frontend dependencies and builds the React app
+- prompts for the deployment path, port, service names, and secret key
+- installs frontend dependencies and rebuilds the React app during deploy
 - creates a `systemd` service
 - writes an Apache config snippet that proxies `/tasks` to the app
 
 Example:
 
-`APP_BASE_PATH=/tasks APP_PORT=18000 ./scripts/deploy.sh`
+`./scripts/deploy.sh`
 
 Important environment variables:
 
@@ -33,6 +34,14 @@ Important environment variables:
 - `SECRET_KEY`: written into `/etc/<app-name>.env` on first deploy if provided
 
 The frontend build also uses `APP_BASE_PATH`, so static assets and API requests resolve correctly when the app is served from `/tasks`.
+
+## Add Users
+
+Create an application user directly in SQLite with:
+
+`.venv/bin/python scripts/add_user.py`
+
+The script prompts for a username and password, hashes the password, and inserts the user into `data/task_tracker.sqlite3`.
 
 ## Features
 
