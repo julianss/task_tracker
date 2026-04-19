@@ -2,7 +2,14 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 
+const basePath = (() => {
+  const rawValue = process.env.TASK_TRACKER_BASE_PATH || "/";
+  const normalizedValue = rawValue.startsWith("/") ? rawValue : `/${rawValue}`;
+  return normalizedValue.endsWith("/") ? normalizedValue : `${normalizedValue}/`;
+})();
+
 export default defineConfig({
+  base: basePath,
   plugins: [react()],
   root: "frontend",
   build: {

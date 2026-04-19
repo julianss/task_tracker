@@ -18,8 +18,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "task_tracker.sqlite3"
 UPLOAD_DIR = BASE_DIR / "data" / "uploads"
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
+APP_BASE_PATH = os.environ.get("APP_BASE_PATH", "/").strip() or "/"
 
 STATUSES = ["todo", "in_progress", "blocked", "done"]
+
+
+def normalize_base_path(value: str) -> str:
+    if not value or value == "/":
+        return "/"
+    normalized = value if value.startswith("/") else f"/{value}"
+    return normalized.rstrip("/") or "/"
+
+
+APP_BASE_PATH = normalize_base_path(APP_BASE_PATH)
 
 
 def utc_now() -> str:
@@ -134,7 +145,8 @@ def row_to_dict(row: sqlite3.Row) -> dict:
 
 def attachment_payload(row: sqlite3.Row) -> dict:
     data = row_to_dict(row)
-    data["url"] = f"/uploads/{data['stored_name']}"
+    prefix = "" if APP_BASE_PATH == "/" else APP_BASE_PATH
+    data["url"] = f"{prefix}/uploads/{data['stored_name']}"
     data["is_image"] = bool(data["mime_type"] and data["mime_type"].startswith("image/"))
     return data
 
@@ -310,6 +322,8 @@ def fetch_attachment_parent_task_id(db: sqlite3.Connection, attachment_id: int) 
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIST), static_url_path="/")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "task-tracker-dev-secret")
+app.config["APPLICATION_ROOT"] = APP_BASE_PATH
+app.config["SESSION_COOKIE_PATH"] = APP_BASE_PATH
 
 
 @app.errorhandler(sqlite3.IntegrityError)

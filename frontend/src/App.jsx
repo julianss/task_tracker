@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { withBasePath } from "./basePath";
 
 const STATUSES = [
   { value: "todo", label: "Por hacer" },
@@ -67,6 +68,10 @@ async function parseResponse(response) {
     throw new Error(message);
   }
   return response.json();
+}
+
+function apiPath(path) {
+  return withBasePath(`/api${path}`);
 }
 
 function formatAuditAction(entry) {
@@ -493,7 +498,7 @@ export default function App() {
   const loadCurrentUser = async () => {
     setAuthLoading(true);
     try {
-      const data = await parseResponse(await fetch("/api/auth/me"));
+      const data = await parseResponse(await fetch(apiPath("/auth/me")));
       setCurrentUser(data.user);
       return data.user;
     } finally {
@@ -502,7 +507,7 @@ export default function App() {
   };
 
   const loadProjects = async () => {
-    const data = await parseResponse(await fetch("/api/projects"));
+    const data = await parseResponse(await fetch(apiPath("/projects")));
     setProjects(data);
     return data;
   };
@@ -515,7 +520,7 @@ export default function App() {
     }
     setSelectedTaskLoading(true);
     try {
-      const data = await parseResponse(await fetch(`/api/tasks/${taskId}`));
+      const data = await parseResponse(await fetch(apiPath(`/tasks/${taskId}`)));
       setSelectedTask(data);
       return data;
     } finally {
@@ -529,7 +534,7 @@ export default function App() {
     if (nextFilters.project_id) params.set("project_id", nextFilters.project_id);
     if (nextFilters.status) params.set("status", nextFilters.status);
     const suffix = params.toString();
-    const data = await parseResponse(await fetch(`/api/tasks${suffix ? `?${suffix}` : ""}`));
+    const data = await parseResponse(await fetch(apiPath(`/tasks${suffix ? `?${suffix}` : ""}`)));
     setTasks(data);
     if (selectedTaskId) {
       const refreshed = data.find((task) => task.id === selectedTaskId);
@@ -545,7 +550,7 @@ export default function App() {
       setBoard(null);
       return null;
     }
-    const data = await parseResponse(await fetch(`/api/projects/${projectId}/board`));
+    const data = await parseResponse(await fetch(apiPath(`/projects/${projectId}/board`)));
     setBoard(data);
     if (selectedTaskId) {
       const refreshed = data.columns.flatMap((column) => column.tasks).find((task) => task.id === selectedTaskId);
@@ -638,7 +643,7 @@ export default function App() {
     setError("");
     try {
       const project = await parseResponse(
-        await fetch("/api/projects", {
+        await fetch(apiPath("/projects"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: projectName }),
@@ -668,7 +673,7 @@ export default function App() {
 
     try {
       const createdTask = await parseResponse(
-        await fetch("/api/tasks", {
+        await fetch(apiPath("/tasks"), {
           method: "POST",
           body: formData,
         }),
@@ -692,7 +697,7 @@ export default function App() {
     setError("");
     try {
       await parseResponse(
-        await fetch(`/api/tasks/${taskId}`, {
+        await fetch(apiPath(`/tasks/${taskId}`), {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status }),
@@ -710,7 +715,7 @@ export default function App() {
     formData.set("body", body);
     attachments.forEach((file) => formData.append("attachments", file));
     const updatedTask = await parseResponse(
-      await fetch(`/api/tasks/${taskId}/comments`, {
+      await fetch(apiPath(`/tasks/${taskId}/comments`), {
         method: "POST",
         body: formData,
       }),
@@ -726,7 +731,7 @@ export default function App() {
     const formData = new FormData();
     attachments.forEach((file) => formData.append("attachments", file));
     const updatedTask = await parseResponse(
-      await fetch(`/api/tasks/${taskId}/attachments`, {
+      await fetch(apiPath(`/tasks/${taskId}/attachments`), {
         method: "POST",
         body: formData,
       }),
@@ -742,7 +747,7 @@ export default function App() {
     setError("");
     try {
       const updatedTask = await parseResponse(
-        await fetch(`/api/attachments/${attachmentId}`, {
+        await fetch(apiPath(`/attachments/${attachmentId}`), {
           method: "DELETE",
         }),
       );
@@ -760,7 +765,7 @@ export default function App() {
     setError("");
     try {
       const updatedTask = await parseResponse(
-        await fetch(`/api/tasks/${taskId}/checklist`, {
+        await fetch(apiPath(`/tasks/${taskId}/checklist`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ body }),
@@ -780,7 +785,7 @@ export default function App() {
     setError("");
     try {
       const updatedTask = await parseResponse(
-        await fetch(`/api/checklist-items/${itemId}`, {
+        await fetch(apiPath(`/checklist-items/${itemId}`), {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ is_done: isDone }),
@@ -800,7 +805,7 @@ export default function App() {
     setError("");
     try {
       const updatedTask = await parseResponse(
-        await fetch(`/api/checklist-items/${itemId}`, {
+        await fetch(apiPath(`/checklist-items/${itemId}`), {
           method: "DELETE",
         }),
       );
@@ -848,7 +853,7 @@ export default function App() {
     setError("");
     try {
       const data = await parseResponse(
-        await fetch("/api/auth/login", {
+        await fetch(apiPath("/auth/login"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(loginForm),
@@ -867,7 +872,7 @@ export default function App() {
     setError("");
     try {
       await parseResponse(
-        await fetch("/api/auth/logout", {
+        await fetch(apiPath("/auth/logout"), {
           method: "POST",
         }),
       );
