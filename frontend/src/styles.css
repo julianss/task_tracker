@@ -1,0 +1,682 @@
+:root {
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  color: #1a202c;
+  background:
+    radial-gradient(circle at top left, rgba(255, 189, 89, 0.3), transparent 24rem),
+    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.18), transparent 30rem),
+    #f7f4ed;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --panel: rgba(255, 252, 247, 0.9);
+  --panel-border: rgba(26, 32, 44, 0.08);
+  --shadow: 0 18px 40px rgba(55, 65, 81, 0.12);
+  --accent: #be5b2d;
+  --accent-strong: #94411b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.toolbar,
+.panel,
+.detail-panel {
+  background: var(--panel);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--shadow);
+}
+
+.panel h2,
+.detail-panel h2,
+.kanban-column-header h3 {
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+}
+
+.view-switch {
+  display: inline-flex;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.view-switch button,
+.toolbar button,
+.stacked-form button,
+.inline-form button,
+.attachment-upload-form button,
+.checklist-form button {
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  padding: 0.8rem 1.2rem;
+}
+
+.view-switch button {
+  background: rgba(31, 41, 55, 0.14);
+  color: rgba(31, 41, 55, 0.68);
+  opacity: 0.8;
+  transition: background-color 140ms ease, color 140ms ease, opacity 140ms ease;
+}
+
+.view-switch .active {
+  background: #1f2937;
+  color: white;
+  opacity: 1;
+}
+
+.ghost-button {
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: white;
+  padding: 0.7rem 1rem;
+}
+
+.toolbar {
+  border-radius: 24px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-row,
+.project-form {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid rgba(26, 32, 44, 0.15);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 0.85rem 1rem;
+}
+
+.search-field {
+  position: relative;
+  min-width: 18rem;
+  flex: 1 1 18rem;
+}
+
+.search-field input {
+  min-width: 0;
+  padding-left: 2.8rem;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  width: 1rem;
+  height: 1rem;
+  color: #6b7280;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.filter-row {
+  flex: 1 1 42rem;
+}
+
+.project-form {
+  flex: 0 1 22rem;
+}
+
+.filter-row input,
+.project-form input,
+.filter-row select,
+.project-form button,
+.filter-row .view-switch {
+  flex: 0 1 auto;
+}
+
+.filter-row select {
+  width: auto;
+  min-width: 10rem;
+}
+
+.project-form input {
+  min-width: 12rem;
+  flex: 1 1 12rem;
+}
+
+.layout {
+  margin-top: 1.5rem;
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.layout-board {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.layout-task-open {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.panel,
+.detail-panel {
+  border-radius: 24px;
+  padding: 1.2rem;
+}
+
+.panel-header,
+.detail-panel-header,
+.task-card-header,
+.task-card-meta,
+.kanban-column-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.panel-header h2,
+.detail-panel h2,
+.kanban-column-header h3 {
+  margin: 0;
+}
+
+.detail-panel-header {
+  align-items: flex-start;
+}
+
+.detail-panel-header p {
+  margin: 0.35rem 0 0;
+  color: #4b5563;
+}
+
+.detail-panel-title {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.detail-project-name {
+  margin: 0;
+  color: var(--accent-strong);
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.detail-task-meta {
+  font-size: 0.95rem;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.section-heading h3 {
+  margin: 0;
+}
+
+.detail-panel-actions {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.detail-panel-full {
+  width: 100%;
+}
+
+.stacked-form,
+.inline-form,
+.comment-list,
+.task-list,
+.kanban-column-body,
+.detail-section {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.task-card,
+.comment-card,
+.kanban-column,
+.attachment-card,
+.modal-card {
+  border: 1px solid rgba(26, 32, 44, 0.08);
+  background: rgba(255, 255, 255, 0.78);
+  border-radius: 20px;
+}
+
+.task-card {
+  padding: 1rem;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    opacity 120ms ease;
+}
+
+.task-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(190, 91, 45, 0.25);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 28px rgba(55, 65, 81, 0.12);
+}
+
+.task-card.is-dragging {
+  opacity: 0.45;
+  transform: rotate(1deg) scale(0.98);
+  box-shadow: 0 20px 36px rgba(55, 65, 81, 0.16);
+}
+
+.task-card p {
+  margin: 0.8rem 0 0;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.status-todo {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.status-in_progress {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-blocked {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.status-done {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.project-name,
+.task-card-meta,
+.empty-state,
+.comment-card small {
+  color: #4b5563;
+}
+
+.task-card-list .task-card-header {
+  justify-content: flex-start;
+}
+
+.task-card-description-row {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.task-card-description-row p {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.task-card-description-row .status-pill {
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+}
+
+.kanban-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.kanban-column {
+  padding: 0.9rem;
+  min-height: 26rem;
+}
+
+.detail-section-summary p {
+  margin: 0;
+}
+
+.detail-status-row {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.detail-status-control {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.detail-status-control span {
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.detail-status-control select {
+  width: auto;
+  min-width: 12rem;
+}
+
+.attachment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 220px));
+  gap: 0.8rem;
+  justify-content: start;
+}
+
+.attachment-card {
+  padding: 0.6rem;
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+}
+
+.attachment-link {
+  text-decoration: none;
+  color: inherit;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.attachment-delete {
+  border: 0;
+  border-radius: 999px;
+  background: rgba(185, 28, 28, 0.1);
+  color: #991b1b;
+  padding: 0.55rem 0.8rem;
+  justify-self: start;
+}
+
+.attachment-link span {
+  word-break: break-word;
+}
+
+.attachment-thumb,
+.attachment-file {
+  width: 100%;
+  height: 90px;
+  border-radius: 14px;
+  object-fit: cover;
+  background: linear-gradient(135deg, #d6e4ff, #f5d0fe);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+
+.comment-card {
+  padding: 1rem;
+}
+
+.inline-form button,
+.attachment-upload-form button {
+  width: auto;
+  justify-self: start;
+}
+
+.attachment-upload-form {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.attachment-upload-form input {
+  width: auto;
+  max-width: 100%;
+}
+
+.checklist-progress {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.checklist-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.checklist-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(26, 32, 44, 0.08);
+  background: rgba(255, 255, 255, 0.78);
+  border-radius: 18px;
+}
+
+.checklist-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.checklist-toggle input {
+  width: auto;
+  margin: 0;
+}
+
+.checklist-item.is-done span {
+  text-decoration: line-through;
+  color: #6b7280;
+}
+
+.danger-button {
+  color: #991b1b;
+  border-color: rgba(153, 27, 27, 0.18);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(26, 32, 44, 0.28);
+  backdrop-filter: blur(6px);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.modal-card {
+  width: min(100%, 32rem);
+  padding: 1.2rem;
+  box-shadow: 0 24px 44px rgba(26, 32, 44, 0.18);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.modal-header h2,
+.modal-header p {
+  margin: 0;
+}
+
+.modal-header p {
+  color: #4b5563;
+  margin-top: 0.35rem;
+}
+
+.checklist-form {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.checklist-form input {
+  flex: 1 1 20rem;
+}
+
+.checklist-form button {
+  width: auto;
+}
+
+.error-banner {
+  margin-top: 1rem;
+  background: #7f1d1d;
+  color: white;
+  border-radius: 18px;
+  padding: 0.9rem 1rem;
+}
+
+@media (max-width: 1200px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .kanban-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    padding: 1rem;
+  }
+
+  .filter-row input {
+    min-width: 0;
+  }
+
+  .search-field {
+    min-width: 0;
+  }
+
+  .filter-row,
+  .project-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-row select,
+  .project-form input,
+  .project-form button,
+  .view-switch,
+  .search-field {
+    width: 100%;
+  }
+
+  .view-switch button {
+    flex: 1 1 0;
+  }
+
+  .kanban-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .task-card-description-row {
+    flex-direction: column;
+  }
+
+  .detail-panel-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .detail-panel-actions .ghost-button {
+    flex: 1 1 0;
+    text-align: center;
+  }
+
+  .detail-status-control {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .detail-status-control select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .attachment-upload-form {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .attachment-upload-form input,
+  .attachment-upload-form button {
+    width: 100%;
+  }
+
+  .checklist-item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .checklist-item .danger-button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .checklist-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .checklist-form input,
+  .checklist-form button {
+    width: 100%;
+  }
+}
