@@ -69,6 +69,54 @@ async function parseResponse(response) {
   return response.json();
 }
 
+function formatAuditAction(entry) {
+  const actor = entry.username || "Usuario desconocido";
+  return `${actor} · ${entry.details}`;
+}
+
+function LoginPage({ loginForm, loggingIn, error, onChange, onSubmit }) {
+  return (
+    <main className="login-shell">
+      <section className="login-panel">
+        <div className="login-copy">
+          <p className="login-eyebrow">Task Tracker</p>
+          <h1>Iniciar sesion</h1>
+          <p>Accede a la aplicacion con un usuario existente en la base de datos.</p>
+        </div>
+        <form className="login-form" onSubmit={onSubmit}>
+          <label>
+            <span>Usuario</span>
+            <input
+              type="text"
+              name="username"
+              value={loginForm.username}
+              onChange={onChange}
+              autoComplete="username"
+              required
+              autoFocus
+            />
+          </label>
+          <label>
+            <span>Contrasena</span>
+            <input
+              type="password"
+              name="password"
+              value={loginForm.password}
+              onChange={onChange}
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          {error ? <div className="error-banner login-error">{error}</div> : null}
+          <button type="submit" disabled={loggingIn}>
+            {loggingIn ? "Entrando..." : "Entrar"}
+          </button>
+        </form>
+      </section>
+    </main>
+  );
+}
+
 function AttachmentGallery({ attachments, onDelete }) {
   if (!attachments?.length) return null;
   return (
@@ -176,6 +224,7 @@ function TaskCard({
 function TaskDetail({
   task,
   loading,
+  currentUser,
   onBack,
   onAddComment,
   onUploadTaskAttachments,
@@ -272,7 +321,11 @@ function TaskDetail({
           <span className={`status-pill status-${task.status}`}>{statusLabel(task.status)}</span>
           <label className="detail-status-control">
             <span>Estado</span>
-            <select value={task.status} onChange={(event) => onStatusChange(task.id, event.target.value)}>
+            <select
+              value={task.status}
+              disabled={!currentUser}
+              onChange={(event) => onStatusChange(task.id, event.target.value)}
+            >
               {STATUSES.map((status) => (
                 <option key={status.value} value={status.value}>
                   {status.label}
@@ -290,15 +343,16 @@ function TaskDetail({
             <input
               type="file"
               multiple
+              disabled={!currentUser}
               onChange={(event) => setTaskFiles(Array.from(event.target.files || []))}
             />
-            <button type="submit" disabled={uploadingTaskFiles || !taskFiles.length}>
+            <button type="submit" disabled={uploadingTaskFiles || !taskFiles.length || !currentUser}>
               {uploadingTaskFiles ? "Subiendo..." : "Subir archivos"}
             </button>
           </form>
         </div>
         {task.attachments.length ? (
-          <AttachmentGallery attachments={task.attachments} onDelete={onDeleteAttachment} />
+          <AttachmentGallery attachments={task.attachments} onDelete={currentUser ? onDeleteAttachment : null} />
         ) : (
           <p className="empty-state">Todavia no hay archivos adjuntos en la tarea.</p>
         )}
@@ -316,11 +370,17 @@ function TaskDetail({
                   <input
                     type="checkbox"
                     checked={item.is_done}
+                    disabled={!currentUser}
                     onChange={(event) => onToggleChecklistItem(item.id, event.target.checked)}
                   />
                   <span>{item.body}</span>
                 </label>
-                <button type="button" className="ghost-button danger-button" onClick={() => onDeleteChecklistItem(item.id)}>
+                <button
+                  type="button"
+                  className="ghost-button danger-button"
+                  disabled={!currentUser}
+                  onClick={() => onDeleteChecklistItem(item.id)}
+                >
                   Eliminar
                 </button>
               </div>
@@ -336,10 +396,25 @@ function TaskDetail({
             value={checklistBody}
             onChange={(event) => setChecklistBody(event.target.value)}
           />
-          <button type="submit" disabled={savingChecklistItem || !checklistBody.trim()}>
+          <button type="submit" disabled={savingChecklistItem || !checklistBody.trim() || !currentUser}>
             {savingChecklistItem ? "Guardando..." : "Agregar elemento"}
           </button>
         </form>
+      </div>
+      <div className="detail-section">
+        <h3>Historial de cambios</h3>
+        <div className="audit-list">
+          {task.audit_logs?.length ? (
+            task.audit_logs.map((entry) => (
+              <article key={entry.id} className="audit-card">
+                <p>{formatAuditAction(entry)}</p>
+                <small>{new Date(entry.created_at).toLocaleString("es-MX")}</small>
+              </article>
+            ))
+          ) : (
+            <p className="empty-state">Todavia no hay eventos de auditoria.</p>
+          )}
+        </div>
       </div>
       <div className="detail-section">
         <h3>Comentarios</h3>
@@ -347,9 +422,12 @@ function TaskDetail({
           {task.comments.length ? (
             task.comments.map((comment) => (
               <article key={comment.id} className="comment-card">
+                <div className="comment-meta">
+                  <strong>{comment.username || "Usuario desconocido"}</strong>
+                  <small>{new Date(comment.created_at).toLocaleString("es-MX")}</small>
+                </div>
                 <p>{comment.body}</p>
-                <small>{new Date(comment.created_at).toLocaleString("es-MX")}</small>
-                <AttachmentGallery attachments={comment.attachments} onDelete={onDeleteAttachment} />
+                <AttachmentGallery attachments={comment.attachments} onDelete={currentUser ? onDeleteAttachment : null} />
               </article>
             ))
           ) : (
@@ -361,20 +439,29 @@ function TaskDetail({
             rows="4"
             placeholder="Agrega notas de implementacion, contexto del error o detalles de seguimiento"
             value={commentBody}
+            disabled={!currentUser}
             onChange={(event) => setCommentBody(event.target.value)}
             required
           />
-          <input type="file" multiple onChange={(event) => setCommentFiles(Array.from(event.target.files || []))} />
-          <button type="submit" disabled={submitting}>
+          <input
+            type="file"
+            multiple
+            disabled={!currentUser}
+            onChange={(event) => setCommentFiles(Array.from(event.target.files || []))}
+          />
+          <button type="submit" disabled={submitting || !currentUser}>
             {submitting ? "Guardando..." : "Agregar comentario"}
           </button>
         </form>
+        {!currentUser ? <p className="empty-state">Inicia sesion para comentar o modificar la tarea.</p> : null}
       </div>
     </section>
   );
 }
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [board, setBoard] = useState(null);
@@ -391,9 +478,28 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [savingTask, setSavingTask] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const [error, setError] = useState("");
 
   const selectedProjectId = filters.project_id || projects[0]?.id || "";
+
+  const requireAuth = () => {
+    if (currentUser) return true;
+    setError("Debes iniciar sesion para modificar datos");
+    return false;
+  };
+
+  const loadCurrentUser = async () => {
+    setAuthLoading(true);
+    try {
+      const data = await parseResponse(await fetch("/api/auth/me"));
+      setCurrentUser(data.user);
+      return data.user;
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   const loadProjects = async () => {
     const data = await parseResponse(await fetch("/api/projects"));
@@ -468,8 +574,16 @@ export default function App() {
   };
 
   useEffect(() => {
-    refreshAll();
+    loadCurrentUser().catch((nextError) => {
+      setError(nextError.message);
+      setAuthLoading(false);
+    });
   }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    refreshAll().catch((nextError) => setError(nextError.message));
+  }, [currentUser]);
 
   useEffect(() => {
     if (!selectedTaskId) {
@@ -519,6 +633,7 @@ export default function App() {
 
   const createProject = async (event) => {
     event.preventDefault();
+    if (!requireAuth()) return;
     setCreatingProject(true);
     setError("");
     try {
@@ -544,6 +659,7 @@ export default function App() {
 
   const createTask = async (event) => {
     event.preventDefault();
+    if (!requireAuth()) return;
     setSavingTask(true);
     setError("");
     const formData = new FormData();
@@ -572,6 +688,7 @@ export default function App() {
   };
 
   const updateTaskStatus = async (taskId, status) => {
+    if (!requireAuth()) return;
     setError("");
     try {
       await parseResponse(
@@ -588,6 +705,7 @@ export default function App() {
   };
 
   const addComment = async (taskId, body, attachments) => {
+    if (!requireAuth()) return;
     const formData = new FormData();
     formData.set("body", body);
     attachments.forEach((file) => formData.append("attachments", file));
@@ -604,6 +722,7 @@ export default function App() {
   };
 
   const uploadTaskAttachments = async (taskId, attachments) => {
+    if (!requireAuth()) return;
     const formData = new FormData();
     attachments.forEach((file) => formData.append("attachments", file));
     const updatedTask = await parseResponse(
@@ -619,6 +738,7 @@ export default function App() {
   };
 
   const deleteAttachment = async (attachmentId) => {
+    if (!requireAuth()) return;
     setError("");
     try {
       const updatedTask = await parseResponse(
@@ -636,6 +756,7 @@ export default function App() {
   };
 
   const addChecklistItem = async (taskId, body) => {
+    if (!requireAuth()) return;
     setError("");
     try {
       const updatedTask = await parseResponse(
@@ -655,6 +776,7 @@ export default function App() {
   };
 
   const toggleChecklistItem = async (itemId, isDone) => {
+    if (!requireAuth()) return;
     setError("");
     try {
       const updatedTask = await parseResponse(
@@ -674,6 +796,7 @@ export default function App() {
   };
 
   const deleteChecklistItem = async (itemId) => {
+    if (!requireAuth()) return;
     setError("");
     try {
       const updatedTask = await parseResponse(
@@ -711,6 +834,72 @@ export default function App() {
     await updateTaskStatus(taskId, status);
     setDraggingTaskId(null);
   };
+
+  const login = async (event) => {
+    event.preventDefault();
+    setLoggingIn(true);
+    setError("");
+    try {
+      const data = await parseResponse(
+        await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(loginForm),
+        }),
+      );
+      setCurrentUser(data.user);
+      setLoginForm({ username: "", password: "" });
+    } catch (nextError) {
+      setError(nextError.message);
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const logout = async () => {
+    setError("");
+    try {
+      await parseResponse(
+        await fetch("/api/auth/logout", {
+          method: "POST",
+        }),
+      );
+      setCurrentUser(null);
+      setSelectedTaskId(null);
+      setSelectedTask(null);
+      setBoard(null);
+      setTasks([]);
+      setProjects([]);
+      syncSelectedTaskInUrl(null);
+    } catch (nextError) {
+      setError(nextError.message);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <main className="login-shell">
+        <section className="login-panel login-panel-loading">
+          <p className="empty-state">Verificando sesion...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <LoginPage
+        loginForm={loginForm}
+        loggingIn={loggingIn}
+        error={error}
+        onChange={(event) => {
+          const { name, value } = event.target;
+          setLoginForm((current) => ({ ...current, [name]: value }));
+        }}
+        onSubmit={login}
+      />
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -775,10 +964,18 @@ export default function App() {
             </button>
           </div>
         </div>
-        <div className="project-form">
-          <button type="button" onClick={() => setIsProjectModalOpen(true)}>
-            Agregar proyecto
-          </button>
+        <div className="toolbar-actions">
+          <div className="project-form">
+            <button type="button" onClick={() => setIsProjectModalOpen(true)}>
+              Agregar proyecto
+            </button>
+          </div>
+          <div className="auth-panel auth-panel-active">
+            <span className="user-badge">Sesion: {currentUser.username}</span>
+            <button type="button" className="ghost-button" onClick={logout}>
+              Cerrar sesion
+            </button>
+          </div>
         </div>
       </section>
 
@@ -787,6 +984,7 @@ export default function App() {
           <TaskDetail
             task={selectedTask}
             loading={selectedTaskLoading}
+            currentUser={currentUser}
             onBack={closeTask}
             onAddComment={addComment}
             onUploadTaskAttachments={uploadTaskAttachments}
@@ -832,9 +1030,10 @@ export default function App() {
                     ))}
                   </select>
                   <input type="file" multiple onChange={(event) => setTaskFiles(Array.from(event.target.files || []))} />
-                  <button type="submit" disabled={savingTask}>
+                  <button type="submit" disabled={savingTask || !currentUser}>
                     {savingTask ? "Guardando..." : "Crear tarea"}
                   </button>
+                  {!currentUser ? <p className="empty-state">Inicia sesion para crear tareas.</p> : null}
                 </form>
               </section>
             ) : null}
