@@ -917,69 +917,83 @@ export default function App() {
         onSubmit={createProject}
       />
 
-      <section className="toolbar">
-        <div className="filter-row">
-          <label className="search-field">
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="search-icon">
-              <path
-                d="M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0-2a8.5 8.5 0 1 1 5.33 15.12l4.52 4.53l-1.41 1.41l-4.53-4.52A8.5 8.5 0 0 1 10.5 2Z"
-                fill="currentColor"
+      <header className="topbar">
+        <section className="toolbar">
+          <div className="toolbar-brand">
+            <span className="toolbar-title">Task Tracker</span>
+          </div>
+          <div className="filter-row">
+            <label className="search-field">
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="search-icon">
+                <path
+                  d="M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Zm0-2a8.5 8.5 0 1 1 5.33 15.12l4.52 4.53l-1.41 1.41l-4.53-4.52A8.5 8.5 0 0 1 10.5 2Z"
+                  fill="currentColor"
+                />
+              </svg>
+              <input
+                type="search"
+                placeholder="Buscar tareas, proyectos o texto en comentarios"
+                value={filters.q}
+                onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
               />
-            </svg>
-            <input
-              type="search"
-              placeholder="Buscar tareas, proyectos o texto en comentarios"
-              value={filters.q}
-              onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
-            />
-          </label>
-          <select
-            value={filters.project_id}
-            onChange={(event) => setFilters((current) => ({ ...current, project_id: event.target.value }))}
-          >
-            <option value="">Todos los proyectos</option>
-            {projectOptions.map((project) => (
-              <option key={project.value} value={project.value}>
-                {project.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filters.status}
-            onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
-          >
-            <option value="">Todos los estados</option>
-            {STATUSES.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
-          <div className="view-switch">
-            <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>
-              Lista
-            </button>
-            <button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>
-              Kanban
-            </button>
+            </label>
+            <select
+              value={filters.project_id}
+              onChange={(event) => setFilters((current) => ({ ...current, project_id: event.target.value }))}
+            >
+              <option value="">Todos los proyectos</option>
+              {projectOptions.map((project) => (
+                <option key={project.value} value={project.value}>
+                  {project.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filters.status}
+              onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
+            >
+              <option value="">Todos los estados</option>
+              {STATUSES.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+            <div className="view-switch">
+              <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>
+                Lista
+              </button>
+              <button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>
+                Kanban
+              </button>
+            </div>
           </div>
-        </div>
-        <div className="toolbar-actions">
-          <div className="project-form">
-            <button type="button" onClick={() => setIsProjectModalOpen(true)}>
-              Agregar proyecto
-            </button>
+          <div className="toolbar-actions">
+            <div className="project-form">
+              <button type="button" onClick={() => setIsProjectModalOpen(true)}>
+                Agregar proyecto
+              </button>
+            </div>
+            <details className="user-menu">
+              <summary className="user-menu-trigger">
+                <span>{currentUser.username}</span>
+                <span className="user-menu-caret" aria-hidden="true">
+                  ▾
+                </span>
+              </summary>
+              <div className="user-menu-popover">
+                <button type="button" className="user-menu-item" onClick={logout}>
+                  Cerrar sesion
+                </button>
+              </div>
+            </details>
           </div>
-          <div className="auth-panel auth-panel-active">
-            <span className="user-badge">Sesion: {currentUser.username}</span>
-            <button type="button" className="ghost-button" onClick={logout}>
-              Cerrar sesion
-            </button>
-          </div>
-        </div>
-      </section>
+        </section>
+      </header>
 
-      <main className={`layout ${view === "board" ? "layout-board" : ""} ${selectedTaskId ? "layout-task-open" : ""}`}>
+      <main
+        className={`layout ${view === "board" ? "layout-board" : ""} ${selectedTaskId ? "layout-task-open" : ""}`}
+      >
         {selectedTaskId ? (
           <TaskDetail
             task={selectedTask}
