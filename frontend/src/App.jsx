@@ -827,6 +827,13 @@ export default function App() {
     syncSelectedTaskInUrl(null);
   };
 
+  const switchView = (nextView) => {
+    setView(nextView);
+    if (selectedTaskId) {
+      closeTask();
+    }
+  };
+
   const onBoardDrop = async (event, status) => {
     event.preventDefault();
     const taskId = event.dataTransfer.getData("text/plain");
@@ -960,10 +967,10 @@ export default function App() {
               ))}
             </select>
             <div className="view-switch">
-              <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>
+              <button className={view === "list" ? "active" : ""} onClick={() => switchView("list")}>
                 Lista
               </button>
-              <button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>
+              <button className={view === "board" ? "active" : ""} onClick={() => switchView("board")}>
                 Kanban
               </button>
             </div>
