@@ -307,7 +307,16 @@ function TaskDetail({
       <div className="detail-panel-header">
         <div className="detail-panel-title">
           <div className="detail-header-topline">
-            <p className="detail-project-name">{task.project_name}</p>
+            <div className="detail-header-summary">
+              <p className="detail-project-name">{task.project_name}</p>
+              <div className="detail-task-heading">
+                <h2>Tarea #{task.id}</h2>
+                <p className="detail-task-meta">
+                  {task.comments.length} comentarios · {task.attachments.length} archivos
+                  {progress ? ` · ${progress} completado` : ""}
+                </p>
+              </div>
+            </div>
             <div className="detail-panel-actions">
               <span className={`status-pill status-${task.status}`}>{statusLabel(task.status)}</span>
               <label className="detail-status-control">
@@ -332,11 +341,6 @@ function TaskDetail({
               </button>
             </div>
           </div>
-          <h2>Tarea #{task.id}</h2>
-          <p className="detail-task-meta">
-            {task.comments.length} comentarios · {task.attachments.length} archivos
-            {progress ? ` · ${progress} completado` : ""}
-          </p>
         </div>
       </div>
       <div className="detail-section detail-section-summary">
