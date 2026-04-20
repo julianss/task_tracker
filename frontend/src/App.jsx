@@ -344,7 +344,7 @@ function TaskDetail({
           <p>{task.description}</p>
         </div>
       </div>
-      <div className="detail-section">
+      <div className="detail-section detail-section-compact">
         <div className="section-heading">
           <h3>Archivos adjuntos</h3>
           <form className="attachment-upload-form" onSubmit={submitTaskAttachments}>
@@ -365,7 +365,7 @@ function TaskDetail({
           <p className="empty-state">Todavia no hay archivos adjuntos en la tarea.</p>
         )}
       </div>
-      <div className="detail-section">
+      <div className="detail-section detail-section-compact">
         <div className="section-heading">
           <h3>Lista de verificacion</h3>
           {progress ? <span className="checklist-progress">{progress} completado</span> : null}
@@ -409,7 +409,7 @@ function TaskDetail({
           </button>
         </form>
       </div>
-      <div className="detail-section">
+      <div className="detail-section detail-activity-panel">
         <div className="detail-tabs" role="tablist" aria-label="Detalle de actividad">
           <button
             type="button"

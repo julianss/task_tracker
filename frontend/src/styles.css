@@ -437,6 +437,20 @@ textarea {
   margin: 0;
 }
 
+.detail-section-compact {
+  gap: 0.65rem;
+}
+
+.detail-activity-panel {
+  gap: 1rem;
+  margin-top: 0.35rem;
+  padding: 1rem;
+  border: 1px solid rgba(26, 32, 44, 0.08);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(244, 240, 231, 0.78), rgba(255, 252, 247, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
 .detail-panel-actions {
   display: flex;
   gap: 0.65rem;
@@ -599,73 +613,80 @@ textarea {
 
 .detail-tabs {
   display: inline-flex;
-  gap: 0.5rem;
+  gap: 0.35rem;
   align-items: center;
   padding: 0.25rem;
-  border-radius: 16px;
-  background: rgba(17, 24, 39, 0.06);
+  border-radius: 14px;
+  border: 1px solid rgba(26, 32, 44, 0.08);
+  background: rgba(255, 255, 255, 0.7);
   width: fit-content;
 }
 
 .detail-tab {
   border: 0;
-  border-radius: 12px;
-  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  padding: 0.5rem 0.85rem;
   background: transparent;
-  color: #4b5563;
+  color: #5b6472;
+  font-size: 0.92rem;
   font-weight: 600;
 }
 
 .detail-tab.is-active {
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 252, 247, 0.98);
   color: var(--accent-strong);
-  box-shadow: 0 8px 18px rgba(26, 32, 44, 0.08);
+  box-shadow: 0 6px 14px rgba(26, 32, 44, 0.08);
 }
 
 .attachment-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 220px));
-  gap: 0.8rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 190px));
+  gap: 0.6rem;
   justify-content: start;
 }
 
 .attachment-card {
-  padding: 0.6rem;
+  padding: 0.5rem;
   display: grid;
-  gap: 0.5rem;
+  gap: 0.35rem;
   align-content: start;
+  border-radius: 16px;
 }
 
 .attachment-link {
   text-decoration: none;
   color: inherit;
   display: grid;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
 .attachment-delete {
-  border: 0;
+  border: 1px solid rgba(153, 27, 27, 0.12);
   border-radius: 999px;
-  background: rgba(185, 28, 28, 0.1);
-  color: #991b1b;
-  padding: 0.55rem 0.8rem;
+  background: rgba(185, 28, 28, 0.05);
+  color: #7f1d1d;
+  font-size: 0.78rem;
+  padding: 0.3rem 0.55rem;
   justify-self: start;
 }
 
 .attachment-link span {
   word-break: break-word;
+  font-size: 0.88rem;
+  line-height: 1.3;
 }
 
 .attachment-thumb,
 .attachment-file {
   width: 100%;
-  height: 90px;
-  border-radius: 14px;
+  height: 72px;
+  border-radius: 12px;
   object-fit: cover;
   background: linear-gradient(135deg, #d6e4ff, #f5d0fe);
   display: grid;
   place-items: center;
   font-weight: 700;
+  font-size: 0.82rem;
 }
 
 .comment-card {
@@ -701,7 +722,7 @@ textarea {
 
 .attachment-upload-form {
   display: flex;
-  gap: 0.65rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
   align-items: center;
 }
@@ -709,39 +730,46 @@ textarea {
 .attachment-upload-form input {
   width: auto;
   max-width: 100%;
+  font-size: 0.9rem;
 }
 
 .checklist-progress {
   color: var(--accent-strong);
   font-weight: 600;
+  font-size: 0.86rem;
 }
 
 .checklist-list {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.45rem;
 }
 
 .checklist-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.75rem;
+  gap: 0.6rem;
   align-items: center;
-  padding: 0.85rem 1rem;
+  padding: 0.6rem 0.8rem;
   border: 1px solid rgba(26, 32, 44, 0.08);
-  background: rgba(255, 255, 255, 0.78);
-  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.64);
+  border-radius: 14px;
 }
 
 .checklist-toggle {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 0.75rem;
+  gap: 0.55rem;
   align-items: center;
 }
 
 .checklist-toggle input {
   width: auto;
   margin: 0;
+}
+
+.checklist-toggle span {
+  font-size: 0.92rem;
+  line-height: 1.35;
 }
 
 .checklist-item.is-done span {
@@ -752,6 +780,7 @@ textarea {
 .danger-button {
   color: #991b1b;
   border-color: rgba(153, 27, 27, 0.18);
+  background: rgba(185, 28, 28, 0.04);
 }
 
 .modal-backdrop {
@@ -791,7 +820,7 @@ textarea {
 
 .checklist-form {
   display: flex;
-  gap: 0.65rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
   align-items: center;
 }
@@ -802,6 +831,18 @@ textarea {
 
 .checklist-form button {
   width: auto;
+}
+
+.detail-section-compact .ghost-button,
+.detail-section-compact .attachment-upload-form button,
+.detail-section-compact .checklist-form button {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.84rem;
+  border-radius: 999px;
+}
+
+.detail-section-compact .ghost-button {
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .error-banner {
