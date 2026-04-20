@@ -243,6 +243,7 @@ function TaskDetail({
   const [commentFiles, setCommentFiles] = useState([]);
   const [taskFiles, setTaskFiles] = useState([]);
   const [checklistBody, setChecklistBody] = useState("");
+  const [activeDetailTab, setActiveDetailTab] = useState("comments");
   const [submitting, setSubmitting] = useState(false);
   const [uploadingTaskFiles, setUploadingTaskFiles] = useState(false);
   const [savingChecklistItem, setSavingChecklistItem] = useState(false);
@@ -305,41 +306,43 @@ function TaskDetail({
     <section className="detail-panel detail-panel-full">
       <div className="detail-panel-header">
         <div className="detail-panel-title">
-          <p className="detail-project-name">{task.project_name}</p>
+          <div className="detail-header-topline">
+            <p className="detail-project-name">{task.project_name}</p>
+            <div className="detail-panel-actions">
+              <span className={`status-pill status-${task.status}`}>{statusLabel(task.status)}</span>
+              <label className="detail-status-control">
+                <span>Estado</span>
+                <select
+                  value={task.status}
+                  disabled={!currentUser}
+                  onChange={(event) => onStatusChange(task.id, event.target.value)}
+                >
+                  {STATUSES.map((status) => (
+                    <option key={status.value} value={status.value}>
+                      {status.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <a className="ghost-button" href={permalink}>
+                Enlace permanente
+              </a>
+              <button className="ghost-button" onClick={onBack}>
+                Volver
+              </button>
+            </div>
+          </div>
           <h2>Tarea #{task.id}</h2>
           <p className="detail-task-meta">
             {task.comments.length} comentarios · {task.attachments.length} archivos
             {progress ? ` · ${progress} completado` : ""}
           </p>
         </div>
-        <div className="detail-panel-actions">
-          <a className="ghost-button" href={permalink}>
-            Enlace permanente
-          </a>
-          <button className="ghost-button" onClick={onBack}>
-            Volver
-          </button>
-        </div>
       </div>
       <div className="detail-section detail-section-summary">
-        <div className="detail-status-row">
-          <span className={`status-pill status-${task.status}`}>{statusLabel(task.status)}</span>
-          <label className="detail-status-control">
-            <span>Estado</span>
-            <select
-              value={task.status}
-              disabled={!currentUser}
-              onChange={(event) => onStatusChange(task.id, event.target.value)}
-            >
-              {STATUSES.map((status) => (
-                <option key={status.value} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="detail-description-card">
+          <p>{task.description}</p>
         </div>
-        <p>{task.description}</p>
       </div>
       <div className="detail-section">
         <div className="section-heading">
@@ -407,58 +410,79 @@ function TaskDetail({
         </form>
       </div>
       <div className="detail-section">
-        <h3>Historial de cambios</h3>
-        <div className="audit-list">
-          {task.audit_logs?.length ? (
-            task.audit_logs.map((entry) => (
-              <article key={entry.id} className="audit-card">
-                <p>{formatAuditAction(entry)}</p>
-                <small>{new Date(entry.created_at).toLocaleString("es-MX")}</small>
-              </article>
-            ))
-          ) : (
-            <p className="empty-state">Todavia no hay eventos de auditoria.</p>
-          )}
-        </div>
-      </div>
-      <div className="detail-section">
-        <h3>Comentarios</h3>
-        <div className="comment-list">
-          {task.comments.length ? (
-            task.comments.map((comment) => (
-              <article key={comment.id} className="comment-card">
-                <div className="comment-meta">
-                  <strong>{comment.username || "Usuario desconocido"}</strong>
-                  <small>{new Date(comment.created_at).toLocaleString("es-MX")}</small>
-                </div>
-                <p>{comment.body}</p>
-                <AttachmentGallery attachments={comment.attachments} onDelete={currentUser ? onDeleteAttachment : null} />
-              </article>
-            ))
-          ) : (
-            <p className="empty-state">Todavia no hay comentarios.</p>
-          )}
-        </div>
-        <form className="inline-form" onSubmit={submitComment}>
-          <textarea
-            rows="4"
-            placeholder="Agrega notas de implementacion, contexto del error o detalles de seguimiento"
-            value={commentBody}
-            disabled={!currentUser}
-            onChange={(event) => setCommentBody(event.target.value)}
-            required
-          />
-          <input
-            type="file"
-            multiple
-            disabled={!currentUser}
-            onChange={(event) => setCommentFiles(Array.from(event.target.files || []))}
-          />
-          <button type="submit" disabled={submitting || !currentUser}>
-            {submitting ? "Guardando..." : "Agregar comentario"}
+        <div className="detail-tabs" role="tablist" aria-label="Detalle de actividad">
+          <button
+            type="button"
+            role="tab"
+            className={`detail-tab ${activeDetailTab === "comments" ? "is-active" : ""}`}
+            aria-selected={activeDetailTab === "comments"}
+            onClick={() => setActiveDetailTab("comments")}
+          >
+            Comentarios
           </button>
-        </form>
-        {!currentUser ? <p className="empty-state">Inicia sesion para comentar o modificar la tarea.</p> : null}
+          <button
+            type="button"
+            role="tab"
+            className={`detail-tab ${activeDetailTab === "history" ? "is-active" : ""}`}
+            aria-selected={activeDetailTab === "history"}
+            onClick={() => setActiveDetailTab("history")}
+          >
+            Historial de cambios
+          </button>
+        </div>
+        {activeDetailTab === "comments" ? (
+          <>
+            <div className="comment-list">
+              {task.comments.length ? (
+                task.comments.map((comment) => (
+                  <article key={comment.id} className="comment-card">
+                    <div className="comment-meta">
+                      <strong>{comment.username || "Usuario desconocido"}</strong>
+                      <small>{new Date(comment.created_at).toLocaleString("es-MX")}</small>
+                    </div>
+                    <p>{comment.body}</p>
+                    <AttachmentGallery attachments={comment.attachments} onDelete={currentUser ? onDeleteAttachment : null} />
+                  </article>
+                ))
+              ) : (
+                <p className="empty-state">Todavia no hay comentarios.</p>
+              )}
+            </div>
+            <form className="inline-form" onSubmit={submitComment}>
+              <textarea
+                rows="4"
+                placeholder="Agrega notas de implementacion, contexto del error o detalles de seguimiento"
+                value={commentBody}
+                disabled={!currentUser}
+                onChange={(event) => setCommentBody(event.target.value)}
+                required
+              />
+              <input
+                type="file"
+                multiple
+                disabled={!currentUser}
+                onChange={(event) => setCommentFiles(Array.from(event.target.files || []))}
+              />
+              <button type="submit" disabled={submitting || !currentUser}>
+                {submitting ? "Guardando..." : "Agregar comentario"}
+              </button>
+            </form>
+            {!currentUser ? <p className="empty-state">Inicia sesion para comentar o modificar la tarea.</p> : null}
+          </>
+        ) : (
+          <div className="audit-list">
+            {task.audit_logs?.length ? (
+              task.audit_logs.map((entry) => (
+                <article key={entry.id} className="audit-card">
+                  <p>{formatAuditAction(entry)}</p>
+                  <small>{new Date(entry.created_at).toLocaleString("es-MX")}</small>
+                </article>
+              ))
+            ) : (
+              <p className="empty-state">Todavia no hay eventos de auditoria.</p>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

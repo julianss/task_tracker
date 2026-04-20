@@ -399,6 +399,16 @@ textarea {
 .detail-panel-title {
   display: grid;
   gap: 0.25rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.detail-header-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.9rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .detail-project-name {
@@ -432,6 +442,7 @@ textarea {
   gap: 0.65rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .detail-panel-full {
@@ -561,13 +572,6 @@ textarea {
   margin: 0;
 }
 
-.detail-status-row {
-  display: flex;
-  gap: 0.9rem;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
 .detail-status-control {
   display: flex;
   gap: 0.6rem;
@@ -583,6 +587,39 @@ textarea {
 .detail-status-control select {
   width: auto;
   min-width: 12rem;
+}
+
+.detail-description-card {
+  padding: 1.15rem 1.25rem;
+  border-radius: 18px;
+  border: 1px solid rgba(190, 91, 45, 0.16);
+  background: linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(255, 247, 237, 0.9));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.detail-tabs {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.25rem;
+  border-radius: 16px;
+  background: rgba(17, 24, 39, 0.06);
+  width: fit-content;
+}
+
+.detail-tab {
+  border: 0;
+  border-radius: 12px;
+  padding: 0.6rem 1rem;
+  background: transparent;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.detail-tab.is-active {
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--accent-strong);
+  box-shadow: 0 8px 18px rgba(26, 32, 44, 0.08);
 }
 
 .attachment-grid {
@@ -844,14 +881,23 @@ textarea {
     flex-direction: column;
   }
 
+  .detail-header-topline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .detail-panel-actions {
     width: 100%;
-    justify-content: stretch;
+    justify-content: flex-start;
+  }
+
+  .detail-panel-actions .ghost-button,
+  .detail-panel-actions .status-pill {
+    text-align: center;
   }
 
   .detail-panel-actions .ghost-button {
     flex: 1 1 0;
-    text-align: center;
   }
 
   .detail-status-control {
@@ -862,6 +908,14 @@ textarea {
   .detail-status-control select {
     width: 100%;
     min-width: 0;
+  }
+
+  .detail-tabs {
+    width: 100%;
+  }
+
+  .detail-tab {
+    flex: 1 1 0;
   }
 
   .attachment-upload-form {
