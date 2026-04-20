@@ -26,6 +26,10 @@ Example:
 
 `./scripts/deploy.sh`
 
+After pulling new changes on the VPS, rebuild the frontend with:
+
+`./scripts/rebuild_frontend.sh`
+
 Important environment variables:
 
 - `APP_BASE_PATH`: public base path for the app, default `/tasks`
