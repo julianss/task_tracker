@@ -238,6 +238,7 @@ function TaskDetail({
   onAddChecklistItem,
   onToggleChecklistItem,
   onDeleteChecklistItem,
+  onUpdateDescription,
 }) {
   const [commentBody, setCommentBody] = useState("");
   const [commentFiles, setCommentFiles] = useState([]);
@@ -247,6 +248,9 @@ function TaskDetail({
   const [submitting, setSubmitting] = useState(false);
   const [uploadingTaskFiles, setUploadingTaskFiles] = useState(false);
   const [savingChecklistItem, setSavingChecklistItem] = useState(false);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionEdit, setDescriptionEdit] = useState("");
+  const [savingDescription, setSavingDescription] = useState(false);
 
   if (loading) {
     return (
@@ -302,6 +306,31 @@ function TaskDetail({
     }
   };
 
+  const startEditingDescription = () => {
+    setDescriptionEdit(task.description);
+    setEditingDescription(true);
+  };
+
+  const cancelEditingDescription = () => {
+    setEditingDescription(false);
+    setDescriptionEdit("");
+  };
+
+  const submitDescription = async () => {
+    if (!descriptionEdit.trim() || descriptionEdit.trim() === task.description) {
+      cancelEditingDescription();
+      return;
+    }
+    setSavingDescription(true);
+    try {
+      await onUpdateDescription(task.id, descriptionEdit.trim());
+      setEditingDescription(false);
+      setDescriptionEdit("");
+    } finally {
+      setSavingDescription(false);
+    }
+  };
+
   return (
     <section className="detail-panel detail-panel-full">
       <div className="detail-panel-header">
@@ -345,7 +374,46 @@ function TaskDetail({
       </div>
       <div className="detail-section detail-section-summary">
         <div className="detail-description-card">
-          <p>{task.description}</p>
+          {editingDescription ? (
+            <div className="description-edit-form">
+              <textarea
+                rows="5"
+                value={descriptionEdit}
+                onChange={(event) => setDescriptionEdit(event.target.value)}
+                disabled={savingDescription}
+              />
+              <div className="description-edit-actions">
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={cancelEditingDescription}
+                  disabled={savingDescription}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={submitDescription}
+                  disabled={savingDescription || !descriptionEdit.trim()}
+                >
+                  {savingDescription ? "Guardando..." : "Guardar"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="description-display">
+              <p>{task.description}</p>
+              {currentUser && (
+                <button
+                  type="button"
+                  className="ghost-button edit-description-button"
+                  onClick={startEditingDescription}
+                >
+                  Editar descripcion
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
       <div className="detail-section detail-section-compact">
@@ -737,6 +805,24 @@ export default function App() {
     }
   };
 
+  const updateTaskDescription = async (taskId, description) => {
+    if (!requireAuth()) return;
+    setError("");
+    try {
+      const updatedTask = await parseResponse(
+        await fetch(apiPath(`/tasks/${taskId}`), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ description }),
+        }),
+      );
+      setSelectedTask(updatedTask);
+      await refreshAll(filters, selectedProjectId);
+    } catch (nextError) {
+      setError(nextError.message);
+    }
+  };
+
   const addComment = async (taskId, body, attachments) => {
     if (!requireAuth()) return;
     const formData = new FormData();
@@ -1035,19 +1121,20 @@ export default function App() {
         className={`layout ${view === "board" ? "layout-board" : ""} ${selectedTaskId ? "layout-task-open" : ""}`}
       >
         {selectedTaskId ? (
-          <TaskDetail
-            task={selectedTask}
-            loading={selectedTaskLoading}
-            currentUser={currentUser}
-            onBack={closeTask}
-            onAddComment={addComment}
-            onUploadTaskAttachments={uploadTaskAttachments}
-            onDeleteAttachment={deleteAttachment}
-            onStatusChange={updateTaskStatus}
-            onAddChecklistItem={addChecklistItem}
-            onToggleChecklistItem={toggleChecklistItem}
-            onDeleteChecklistItem={deleteChecklistItem}
-          />
+        <TaskDetail
+          task={selectedTask}
+          loading={selectedTaskLoading}
+          currentUser={currentUser}
+          onBack={closeTask}
+          onAddComment={addComment}
+          onUploadTaskAttachments={uploadTaskAttachments}
+          onDeleteAttachment={deleteAttachment}
+          onStatusChange={updateTaskStatus}
+          onAddChecklistItem={addChecklistItem}
+          onToggleChecklistItem={toggleChecklistItem}
+          onDeleteChecklistItem={deleteChecklistItem}
+          onUpdateDescription={updateTaskDescription}
+        />
         ) : (
           <>
             {view === "list" ? (
