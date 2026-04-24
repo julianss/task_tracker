@@ -423,6 +423,13 @@ textarea {
   margin: 0;
 }
 
+.detail-timestamp-meta {
+  margin: 0;
+  width: 100%;
+  font-size: 0.88rem;
+  color: #6b7280;
+}
+
 .detail-header-topline {
   display: flex;
   justify-content: space-between;
@@ -554,9 +561,9 @@ textarea {
   color: #1d4ed8;
 }
 
-.status-blocked {
-  background: #fee2e2;
-  color: #b91c1c;
+.status-testing {
+  background: #fef3c7;
+  color: #b45309;
 }
 
 .status-done {
@@ -592,6 +599,134 @@ textarea {
   margin-top: 0.15rem;
 }
 
+.data-table-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.data-table-toolbar,
+.data-table-summary,
+.pagination-bar,
+.pagination-actions,
+.page-size-control {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.data-table-summary h2,
+.data-table-summary span,
+.page-size-control span,
+.pagination-bar span {
+  margin: 0;
+}
+
+.page-size-control {
+  justify-content: flex-start;
+}
+
+.page-size-control span,
+.data-table-summary span,
+.pagination-bar span,
+.page-indicator {
+  color: #4b5563;
+  font-size: 0.92rem;
+}
+
+.page-size-control select {
+  width: auto;
+  min-width: 5.5rem;
+}
+
+.data-table-scroll {
+  overflow: auto;
+  border: 1px solid rgba(26, 32, 44, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.task-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.task-table th,
+.task-table td {
+  padding: 0.85rem 0.9rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(26, 32, 44, 0.08);
+  vertical-align: top;
+}
+
+.task-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(246, 241, 232, 0.98);
+}
+
+.task-table tbody tr {
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.task-table tbody tr:hover {
+  background: rgba(190, 91, 45, 0.06);
+}
+
+.task-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.task-table .filter-row-head th {
+  top: 49px;
+  background: rgba(255, 252, 247, 0.98);
+  padding-top: 0.65rem;
+  padding-bottom: 0.75rem;
+}
+
+.task-table .filter-row-head input,
+.task-table .filter-row-head select {
+  min-width: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #111827;
+  font-weight: 700;
+}
+
+.sort-button span {
+  color: var(--accent-strong);
+  font-size: 0.8rem;
+}
+
+.cell-id {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cell-description {
+  min-width: 20rem;
+}
+
+.data-table-empty {
+  text-align: center;
+  padding: 1.5rem 1rem;
+}
+
 .kanban-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -622,6 +757,23 @@ textarea {
 .detail-status-control select {
   width: auto;
   min-width: 12rem;
+}
+
+.board-project-control {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.board-project-control span {
+  font-size: 0.92rem;
+  color: #4b5563;
+}
+
+.board-project-control select {
+  width: auto;
+  min-width: 14rem;
 }
 
 .detail-description-card {
@@ -752,12 +904,18 @@ textarea {
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
 }
 
 .comment-meta strong {
   color: var(--accent-strong);
+}
+
+.comment-meta small {
+  display: block;
+  max-width: 100%;
+  text-align: right;
 }
 
 .audit-card {
@@ -973,6 +1131,21 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .data-table-toolbar,
+  .pagination-bar,
+  .pagination-actions,
+  .page-size-control {
+    align-items: stretch;
+  }
+
+  .pagination-actions .ghost-button {
+    flex: 1 1 0;
+  }
+
+  .page-size-control select {
+    width: 100%;
+  }
+
   .task-card-description-row {
     flex-direction: column;
   }
@@ -984,6 +1157,10 @@ textarea {
 
   .detail-task-heading {
     align-items: flex-start;
+  }
+
+  .comment-meta small {
+    text-align: left;
   }
 
   .detail-header-summary {
@@ -1010,6 +1187,16 @@ textarea {
   }
 
   .detail-status-control select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .board-project-control {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .board-project-control select {
     width: 100%;
     min-width: 0;
   }

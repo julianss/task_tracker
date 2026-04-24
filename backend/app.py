@@ -20,7 +20,7 @@ UPLOAD_DIR = BASE_DIR / "data" / "uploads"
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 APP_BASE_PATH = os.environ.get("APP_BASE_PATH", "/").strip() or "/"
 
-STATUSES = ["todo", "in_progress", "blocked", "done"]
+STATUSES = ["todo", "in_progress", "testing", "done"]
 
 
 def normalize_base_path(value: str) -> str:
@@ -72,6 +72,7 @@ def init_db() -> None:
                 body TEXT NOT NULL,
                 user_id INTEGER,
                 created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
                 FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
             );
@@ -124,6 +125,11 @@ def init_db() -> None:
         comment_columns = {row["name"] for row in db.execute("PRAGMA table_info(comments)").fetchall()}
         if "user_id" not in comment_columns:
             db.execute("ALTER TABLE comments ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL")
+        if "updated_at" not in comment_columns:
+            db.execute("ALTER TABLE comments ADD COLUMN updated_at TEXT")
+            db.execute("UPDATE comments SET updated_at = created_at WHERE updated_at IS NULL")
+            db.execute("UPDATE comments SET updated_at = ? WHERE updated_at IS NULL", (utc_now(),))
+        db.execute("UPDATE tasks SET status = 'testing' WHERE status = 'blocked'")
         count = db.execute("SELECT COUNT(*) AS count FROM projects").fetchone()["count"]
         if count == 0:
             db.execute(
@@ -688,9 +694,10 @@ def create_comment(task_id: int):
     with closing(get_db()) as db:
         user = require_current_user(db)
         fetch_task(db, task_id)
+        now = utc_now()
         cursor = db.execute(
-            "INSERT INTO comments (task_id, body, user_id, created_at) VALUES (?, ?, ?, ?)",
-            (task_id, body, user["id"], utc_now()),
+            "INSERT INTO comments (task_id, body, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            (task_id, body, user["id"], now, now),
         )
         files = request.files.getlist("attachments")
         save_uploaded_files(db, files, comment_id=cursor.lastrowid)
@@ -737,7 +744,7 @@ def project_board(project_id: int):
                 task["progress_percent"] = round((completed / len(task["checklist_items"])) * 100)
             else:
                 task["progress_percent"] = None
-            columns[task["status"]].append(task)
+            columns.setdefault(task["status"], columns["todo"]).append(task)
         return jsonify(
             {
                 "project": row_to_dict(project),

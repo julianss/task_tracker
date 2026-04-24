@@ -4,7 +4,7 @@ import { withBasePath } from "./basePath";
 const STATUSES = [
   { value: "todo", label: "Por hacer" },
   { value: "in_progress", label: "En progreso" },
-  { value: "blocked", label: "Bloqueada" },
+  { value: "testing", label: "Probar" },
   { value: "done", label: "Hecha" },
 ];
 
@@ -14,8 +14,25 @@ const emptyTaskForm = {
   status: "todo",
 };
 
+const STATUS_ORDER = {
+  todo: 0,
+  in_progress: 1,
+  testing: 2,
+  done: 3,
+};
+
+const TABLE_PAGE_SIZES = [10, 20, 50];
+
 function statusLabel(status) {
   return STATUSES.find((item) => item.value === status)?.label ?? status;
+}
+
+function compareValues(left, right) {
+  if (left == null && right == null) return 0;
+  if (left == null) return -1;
+  if (right == null) return 1;
+  if (typeof left === "number" && typeof right === "number") return left - right;
+  return String(left).localeCompare(String(right), "es-MX", { numeric: true, sensitivity: "base" });
 }
 
 function truncateText(text, maxLength) {
@@ -25,6 +42,29 @@ function truncateText(text, maxLength) {
 
 function formatProgress(task) {
   return typeof task.progress_percent === "number" ? `${task.progress_percent}%` : null;
+}
+
+function formatChecklistSummary(task) {
+  const checklistItems = getChecklistItems(task);
+  if (!checklistItems.length) return null;
+  const progress = formatProgress(task);
+  return progress ? `${checklistItems.length} subtareas, ${progress} completado` : `${checklistItems.length} subtareas`;
+}
+
+function formatTableDate(value) {
+  if (!value) return "Sin fecha";
+  return new Date(value).toLocaleString("es-MX", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
+
+function formatTimestampPair(createdAt, updatedAt) {
+  const parts = [`Creado ${formatTableDate(createdAt)}`];
+  if (updatedAt) {
+    parts.push(`Actualizado ${formatTableDate(updatedAt)}`);
+  }
+  return parts.join(" · ");
 }
 
 function getChecklistItems(task) {
@@ -180,6 +220,293 @@ function ProjectModal({ open, projectName, creatingProject, onClose, onChange, o
   );
 }
 
+function TaskTable({ tasks, onOpenTask }) {
+  const [columnFilters, setColumnFilters] = useState({
+    id: "",
+    project_name: "",
+    description: "",
+    status: "",
+    created_at: "",
+    updated_at: "",
+  });
+  const [sortConfig, setSortConfig] = useState({ key: "updated_at", direction: "desc" });
+  const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZES[0]);
+  const [page, setPage] = useState(1);
+
+  const filteredTasks = useMemo(() => {
+    const normalizedFilters = Object.fromEntries(
+      Object.entries(columnFilters).map(([key, value]) => [key, value.trim().toLowerCase()]),
+    );
+
+    return tasks.filter((task) => {
+      if (normalizedFilters.id && !String(task.id).includes(normalizedFilters.id)) return false;
+      if (normalizedFilters.project_name && !task.project_name.toLowerCase().includes(normalizedFilters.project_name)) {
+        return false;
+      }
+      if (normalizedFilters.description && !task.description.toLowerCase().includes(normalizedFilters.description)) {
+        return false;
+      }
+      if (normalizedFilters.status && task.status !== normalizedFilters.status) return false;
+      if (normalizedFilters.created_at && !String(task.created_at ?? "").toLowerCase().includes(normalizedFilters.created_at)) {
+        return false;
+      }
+      if (normalizedFilters.updated_at && !String(task.updated_at ?? "").toLowerCase().includes(normalizedFilters.updated_at)) {
+        return false;
+      }
+      return true;
+    });
+  }, [columnFilters, tasks]);
+
+  const sortedTasks = useMemo(() => {
+    const sorted = [...filteredTasks];
+    sorted.sort((left, right) => {
+      let comparison = 0;
+      switch (sortConfig.key) {
+        case "id":
+          comparison = compareValues(left.id, right.id);
+          break;
+        case "project_name":
+          comparison = compareValues(left.project_name, right.project_name);
+          break;
+        case "description":
+          comparison = compareValues(left.description, right.description);
+          break;
+        case "status":
+          comparison = compareValues(STATUS_ORDER[left.status], STATUS_ORDER[right.status]);
+          break;
+        case "created_at":
+          comparison = compareValues(left.created_at, right.created_at);
+          break;
+        case "updated_at":
+          comparison = compareValues(left.updated_at, right.updated_at);
+          break;
+        default:
+          comparison = 0;
+      }
+
+      if (comparison === 0) {
+        comparison = compareValues(left.id, right.id);
+      }
+      return sortConfig.direction === "asc" ? comparison : -comparison;
+    });
+    return sorted;
+  }, [filteredTasks, sortConfig]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedTasks.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * pageSize;
+  const paginatedTasks = sortedTasks.slice(pageStart, pageStart + pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [columnFilters, pageSize, tasks.length]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const toggleSort = (key) => {
+    setSortConfig((current) => {
+      if (current.key === key) {
+        return { key, direction: current.direction === "asc" ? "desc" : "asc" };
+      }
+      return { key, direction: "asc" };
+    });
+  };
+
+  const sortIndicator = (key) => {
+    if (sortConfig.key !== key) return "↕";
+    return sortConfig.direction === "asc" ? "↑" : "↓";
+  };
+
+  const updateFilter = (key, value) => {
+    setColumnFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  return (
+    <div className="data-table-shell">
+      <div className="data-table-toolbar">
+        <div className="data-table-summary">
+          <h2>Lista de tareas</h2>
+          <span>
+            {sortedTasks.length} de {tasks.length} tareas
+          </span>
+        </div>
+        <label className="page-size-control">
+          <span>Filas por pagina</span>
+          <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
+            {TABLE_PAGE_SIZES.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {tasks.length ? (
+        <>
+          <div className="data-table-scroll">
+            <table className="task-table">
+              <thead>
+                <tr>
+                  <th>
+                    <button type="button" className="sort-button" onClick={() => toggleSort("id")}>
+                      ID <span>{sortIndicator("id")}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="sort-button" onClick={() => toggleSort("project_name")}>
+                      Proyecto <span>{sortIndicator("project_name")}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="sort-button" onClick={() => toggleSort("description")}>
+                      Descripcion <span>{sortIndicator("description")}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="sort-button" onClick={() => toggleSort("status")}>
+                      Estado <span>{sortIndicator("status")}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="sort-button" onClick={() => toggleSort("created_at")}>
+                      Creada <span>{sortIndicator("created_at")}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="sort-button" onClick={() => toggleSort("updated_at")}>
+                      Actualizada <span>{sortIndicator("updated_at")}</span>
+                    </button>
+                  </th>
+                </tr>
+                <tr className="filter-row-head">
+                  <th>
+                    <input
+                      type="search"
+                      placeholder="Filtrar"
+                      value={columnFilters.id}
+                      onChange={(event) => updateFilter("id", event.target.value)}
+                    />
+                  </th>
+                  <th>
+                    <input
+                      type="search"
+                      placeholder="Filtrar"
+                      value={columnFilters.project_name}
+                      onChange={(event) => updateFilter("project_name", event.target.value)}
+                    />
+                  </th>
+                  <th>
+                    <input
+                      type="search"
+                      placeholder="Filtrar"
+                      value={columnFilters.description}
+                      onChange={(event) => updateFilter("description", event.target.value)}
+                    />
+                  </th>
+                  <th>
+                    <select value={columnFilters.status} onChange={(event) => updateFilter("status", event.target.value)}>
+                      <option value="">Todos</option>
+                      {STATUSES.map((status) => (
+                        <option key={status.value} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                  </th>
+                  <th>
+                    <input
+                      type="search"
+                      placeholder="2026-04-24"
+                      value={columnFilters.created_at}
+                      onChange={(event) => updateFilter("created_at", event.target.value)}
+                    />
+                  </th>
+                  <th>
+                    <input
+                      type="search"
+                      placeholder="2026-04-24"
+                      value={columnFilters.updated_at}
+                      onChange={(event) => updateFilter("updated_at", event.target.value)}
+                    />
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedTasks.length ? (
+                  paginatedTasks.map((task) => (
+                    <tr key={task.id} onClick={() => onOpenTask(task)}>
+                      <td className="cell-id">#{task.id}</td>
+                      <td>{task.project_name}</td>
+                      <td className="cell-description">{truncateText(task.description, 140)}</td>
+                      <td>
+                        <span className={`status-pill status-${task.status}`}>{statusLabel(task.status)}</span>
+                      </td>
+                      <td>{formatTableDate(task.created_at)}</td>
+                      <td>{formatTableDate(task.updated_at)}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="empty-state data-table-empty">
+                      Ninguna tarea coincide con los filtros de la tabla.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="pagination-bar">
+            <span>
+              Mostrando {sortedTasks.length ? pageStart + 1 : 0}-{Math.min(pageStart + paginatedTasks.length, sortedTasks.length)} de{" "}
+              {sortedTasks.length}
+            </span>
+            <div className="pagination-actions">
+              <button type="button" className="ghost-button" disabled={currentPage === 1} onClick={() => setPage(1)}>
+                Primero
+              </button>
+              <button
+                type="button"
+                className="ghost-button"
+                disabled={currentPage === 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+              >
+                Anterior
+              </button>
+              <span className="page-indicator">
+                Pagina {currentPage} de {totalPages}
+              </span>
+              <button
+                type="button"
+                className="ghost-button"
+                disabled={currentPage === totalPages}
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              >
+                Siguiente
+              </button>
+              <button
+                type="button"
+                className="ghost-button"
+                disabled={currentPage === totalPages}
+                onClick={() => setPage(totalPages)}
+              >
+                Ultima
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <p className="empty-state">Ninguna tarea coincide con los filtros actuales.</p>
+      )}
+    </div>
+  );
+}
+
 function TaskCard({
   task,
   onSelect,
@@ -189,6 +516,7 @@ function TaskCard({
   onDragStateChange,
 }) {
   const isList = variant === "list";
+  const checklistSummary = formatChecklistSummary(task);
 
   return (
     <article
@@ -220,7 +548,7 @@ function TaskCard({
       <div className="task-card-meta">
         <span>{task.comments.length} comentarios</span>
         <span>{task.attachments.length} archivos</span>
-        {formatProgress(task) ? <span>{formatProgress(task)} completado</span> : null}
+        {checklistSummary ? <span>{checklistSummary}</span> : null}
       </div>
     </article>
   );
@@ -270,6 +598,7 @@ function TaskDetail({
   const permalink = buildTaskPermalink(task.id);
   const progress = formatProgress(task);
   const checklistItems = getChecklistItems(task);
+  const checklistSummary = formatChecklistSummary(task);
 
   const submitComment = async (event) => {
     event.preventDefault();
@@ -342,8 +671,9 @@ function TaskDetail({
                 <h2>Tarea #{task.id}</h2>
                 <p className="detail-task-meta">
                   {task.comments.length} comentarios · {task.attachments.length} archivos
-                  {progress ? ` · ${progress} completado` : ""}
+                  {checklistSummary ? ` · ${checklistSummary}` : ""}
                 </p>
+                <p className="detail-timestamp-meta">{formatTimestampPair(task.created_at, task.updated_at)}</p>
               </div>
             </div>
             <div className="detail-panel-actions">
@@ -510,7 +840,7 @@ function TaskDetail({
                   <article key={comment.id} className="comment-card">
                     <div className="comment-meta">
                       <strong>{comment.username || "Usuario desconocido"}</strong>
-                      <small>{new Date(comment.created_at).toLocaleString("es-MX")}</small>
+                      <small>{formatTimestampPair(comment.created_at, comment.updated_at)}</small>
                     </div>
                     <p>{comment.body}</p>
                     <AttachmentGallery attachments={comment.attachments} onDelete={currentUser ? onDeleteAttachment : null} />
@@ -570,7 +900,8 @@ export default function App() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [selectedTaskLoading, setSelectedTaskLoading] = useState(false);
   const [view, setView] = useState("list");
-  const [filters, setFilters] = useState({ q: "", project_id: "", status: "" });
+  const [filters, setFilters] = useState({ q: "" });
+  const [selectedProjectId, setSelectedProjectId] = useState("");
   const [taskForm, setTaskForm] = useState(emptyTaskForm);
   const [taskFiles, setTaskFiles] = useState([]);
   const [projectName, setProjectName] = useState("");
@@ -582,8 +913,6 @@ export default function App() {
   const [loggingIn, setLoggingIn] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [error, setError] = useState("");
-
-  const selectedProjectId = filters.project_id || projects[0]?.id || "";
 
   const requireAuth = () => {
     if (currentUser) return true;
@@ -627,8 +956,6 @@ export default function App() {
   const loadTasks = async (nextFilters = filters) => {
     const params = new URLSearchParams();
     if (nextFilters.q) params.set("q", nextFilters.q);
-    if (nextFilters.project_id) params.set("project_id", nextFilters.project_id);
-    if (nextFilters.status) params.set("status", nextFilters.status);
     const suffix = params.toString();
     const data = await parseResponse(await fetch(apiPath(`/tasks${suffix ? `?${suffix}` : ""}`)));
     setTasks(data);
@@ -663,6 +990,7 @@ export default function App() {
     try {
       const loadedProjects = await loadProjects();
       const effectiveProjectId = nextProjectId || loadedProjects[0]?.id || "";
+      setSelectedProjectId((current) => current || String(effectiveProjectId || ""));
       await Promise.all([loadTasks(nextFilters), loadBoard(effectiveProjectId)]);
       if (!taskForm.project_id && loadedProjects[0]?.id) {
         setTaskForm((current) => ({ ...current, project_id: String(loadedProjects[0].id) }));
@@ -703,17 +1031,17 @@ export default function App() {
 
   useEffect(() => {
     loadTasks(filters).catch((nextError) => setError(nextError.message));
-  }, [filters.q, filters.project_id, filters.status]);
+  }, [filters.q]);
 
   useEffect(() => {
     loadBoard(selectedProjectId).catch((nextError) => setError(nextError.message));
   }, [selectedProjectId]);
 
   useEffect(() => {
-    if (filters.project_id) {
-      setTaskForm((current) => ({ ...current, project_id: filters.project_id }));
+    if (!selectedProjectId && projects[0]?.id) {
+      setSelectedProjectId(String(projects[0].id));
     }
-  }, [filters.project_id]);
+  }, [projects, selectedProjectId]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -748,7 +1076,7 @@ export default function App() {
       setProjectName("");
       const nextProjects = [...projects, project].sort((a, b) => a.name.localeCompare(b.name));
       setProjects(nextProjects);
-      setFilters((current) => ({ ...current, project_id: String(project.id) }));
+      setSelectedProjectId(String(project.id));
       setTaskForm((current) => ({ ...current, project_id: String(project.id) }));
       setIsProjectModalOpen(false);
     } catch (nextError) {
@@ -780,7 +1108,7 @@ export default function App() {
       setSelectedTaskLoading(false);
       setSelectedTask(createdTask);
       syncSelectedTaskInUrl(createdTask.id);
-      await refreshAll(filters, filters.project_id || createdTask.project_id);
+      await refreshAll(filters, selectedProjectId || createdTask.project_id);
     } catch (nextError) {
       setError(nextError.message);
     } finally {
@@ -1063,28 +1391,6 @@ export default function App() {
                 onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
               />
             </label>
-            <select
-              value={filters.project_id}
-              onChange={(event) => setFilters((current) => ({ ...current, project_id: event.target.value }))}
-            >
-              <option value="">Todos los proyectos</option>
-              {projectOptions.map((project) => (
-                <option key={project.value} value={project.value}>
-                  {project.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filters.status}
-              onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
-            >
-              <option value="">Todos los estados</option>
-              {STATUSES.map((status) => (
-                <option key={status.value} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
-            </select>
             <div className="view-switch">
               <button className={view === "list" ? "active" : ""} onClick={() => switchView("list")}>
                 Lista
@@ -1184,25 +1490,26 @@ export default function App() {
                 <p className="empty-state">Cargando...</p>
               ) : view === "list" ? (
                 <>
-                  <div className="panel-header">
-                    <h2>Lista de tareas</h2>
-                    <span>{tasks.length} tareas coinciden</span>
-                  </div>
-                  <div className="task-list">
-                    {tasks.length ? (
-                      tasks.map((task) => (
-                        <TaskCard key={task.id} task={task} onSelect={openTask} variant="list" />
-                      ))
-                    ) : (
-                      <p className="empty-state">Ninguna tarea coincide con los filtros actuales.</p>
-                    )}
-                  </div>
+                  <TaskTable tasks={tasks} onOpenTask={openTask} />
                 </>
               ) : (
                 <>
                   <div className="panel-header">
                     <h2>Kanban del proyecto</h2>
-                    <span>{board?.project?.name || "Elige un proyecto"}</span>
+                    <label className="board-project-control">
+                      <span>Proyecto</span>
+                      <select
+                        value={selectedProjectId}
+                        onChange={(event) => setSelectedProjectId(event.target.value)}
+                      >
+                        <option value="">Elegir proyecto</option>
+                        {projectOptions.map((project) => (
+                          <option key={project.value} value={project.value}>
+                            {project.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
                   {board ? (
                     <div className="kanban-grid">
