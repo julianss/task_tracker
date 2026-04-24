@@ -537,6 +537,12 @@ textarea {
   box-shadow: 0 20px 36px rgba(55, 65, 81, 0.16);
 }
 
+.task-card.is-saving {
+  opacity: 0.72;
+  border-color: rgba(190, 91, 45, 0.3);
+  box-shadow: 0 16px 32px rgba(55, 65, 81, 0.14);
+}
+
 .task-card p {
   margin: 0.8rem 0 0;
 }

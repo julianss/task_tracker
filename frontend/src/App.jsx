@@ -119,6 +119,30 @@ function formatAuditAction(entry) {
   return `${actor} · ${entry.details}`;
 }
 
+function compareTasksByRecency(left, right) {
+  return compareValues(right.updated_at, left.updated_at) || compareValues(right.id, left.id);
+}
+
+function mergeTaskIntoBoard(currentBoard, updatedTask) {
+  if (!currentBoard || String(currentBoard.project?.id) !== String(updatedTask.project_id)) {
+    return currentBoard;
+  }
+  const columns = currentBoard.columns.map((column) => {
+    const existingTasks = column.tasks.filter((task) => task.id !== updatedTask.id);
+    if (column.status !== updatedTask.status) {
+      return { ...column, tasks: existingTasks };
+    }
+    return { ...column, tasks: [...existingTasks, updatedTask].sort(compareTasksByRecency) };
+  });
+  return { ...currentBoard, columns };
+}
+
+function mergeTaskIntoList(currentTasks, updatedTask) {
+  const hasTask = currentTasks.some((task) => task.id === updatedTask.id);
+  if (!hasTask) return currentTasks;
+  return currentTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)).sort(compareTasksByRecency);
+}
+
 function LoginPage({ loginForm, loggingIn, error, onChange, onSubmit }) {
   return (
     <main className="login-shell">
@@ -513,6 +537,7 @@ function TaskCard({
   draggable = false,
   variant = "list",
   isDragging = false,
+  isSaving = false,
   onDragStateChange,
 }) {
   const isList = variant === "list";
@@ -520,7 +545,7 @@ function TaskCard({
 
   return (
     <article
-      className={`task-card task-card-${variant} ${isDragging ? "is-dragging" : ""}`}
+      className={`task-card task-card-${variant} ${isDragging ? "is-dragging" : ""} ${isSaving ? "is-saving" : ""}`}
       draggable={draggable}
       onDragStart={(event) => {
         if (!draggable) return;
@@ -907,6 +932,7 @@ export default function App() {
   const [projectName, setProjectName] = useState("");
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [draggingTaskId, setDraggingTaskId] = useState(null);
+  const [movingTaskId, setMovingTaskId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [savingTask, setSavingTask] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
@@ -1119,17 +1145,49 @@ export default function App() {
   const updateTaskStatus = async (taskId, status) => {
     if (!requireAuth()) return;
     setError("");
+    const numericTaskId = Number(taskId);
+    const optimisticTask =
+      board?.columns.flatMap((column) => column.tasks).find((task) => task.id === numericTaskId) ||
+      tasks.find((task) => task.id === numericTaskId) ||
+      (selectedTask?.id === numericTaskId ? selectedTask : null);
+    const previousBoard = board;
+    const previousTasks = tasks;
+    const previousSelectedTask = selectedTask;
+
+    if (optimisticTask && optimisticTask.status !== status) {
+      const nextTask = {
+        ...optimisticTask,
+        status,
+        updated_at: new Date().toISOString(),
+      };
+      setBoard((current) => mergeTaskIntoBoard(current, nextTask));
+      setTasks((current) => mergeTaskIntoList(current, nextTask));
+      if (selectedTask?.id === numericTaskId) {
+        setSelectedTask(nextTask);
+      }
+    }
+
+    setMovingTaskId(numericTaskId);
     try {
-      await parseResponse(
+      const updatedTask = await parseResponse(
         await fetch(apiPath(`/tasks/${taskId}`), {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status }),
         }),
       );
-      await refreshAll(filters, selectedProjectId);
+      setBoard((current) => mergeTaskIntoBoard(current, updatedTask));
+      setTasks((current) => mergeTaskIntoList(current, updatedTask));
+      if (selectedTask?.id === numericTaskId) {
+        setSelectedTask(updatedTask);
+      }
     } catch (nextError) {
+      setBoard(previousBoard);
+      setTasks(previousTasks);
+      setSelectedTask(previousSelectedTask);
       setError(nextError.message);
+    } finally {
+      setMovingTaskId(null);
     }
   };
 
@@ -1532,6 +1590,7 @@ export default function App() {
                                 draggable
                                 variant="board"
                                 isDragging={draggingTaskId === task.id}
+                                isSaving={movingTaskId === task.id}
                                 onDragStateChange={setDraggingTaskId}
                                 onSelect={openTask}
                               />
