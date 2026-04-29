@@ -67,6 +67,9 @@ APP_GROUP_DEFAULT="${APP_GROUP:-${APP_GROUP:-${APP_USER_DEFAULT}}}"
 APP_PORT_DEFAULT="${APP_PORT:-18000}"
 APP_BASE_PATH_DEFAULT="$(normalize_base_path "${APP_BASE_PATH:-/tasks}")"
 SECRET_KEY_DEFAULT="${SECRET_KEY:-change-me-in-/etc/${APP_NAME_DEFAULT}.env}"
+MAILERSEND_API_TOKEN_DEFAULT="${MAILERSEND_API_TOKEN:-}"
+MAILERSEND_FROM_EMAIL_DEFAULT="${MAILERSEND_FROM_EMAIL:-}"
+MAILERSEND_FROM_NAME_DEFAULT="${MAILERSEND_FROM_NAME:-Task Tracker}"
 
 prompt_with_default APP_NAME "Application name" "${APP_NAME_DEFAULT}"
 prompt_with_default APP_USER "System user for the service" "${APP_USER_DEFAULT}"
@@ -90,6 +93,9 @@ prompt_with_default APACHE_CONF_NAME "Apache config name" "${APACHE_CONF_NAME_DE
 prompt_with_default ENV_FILE "Environment file" "${ENV_FILE_DEFAULT}"
 prompt_with_default VENV_DIR "Virtualenv path" "${VENV_DIR_DEFAULT}"
 prompt_secret_with_default SECRET_KEY "SECRET_KEY for Flask sessions" "${SECRET_KEY_DEFAULT}"
+prompt_secret_with_default MAILERSEND_API_TOKEN "MAILERSEND_API_TOKEN for notifications" "${MAILERSEND_API_TOKEN_DEFAULT}"
+prompt_with_default MAILERSEND_FROM_EMAIL "MAILERSEND_FROM_EMAIL sender address" "${MAILERSEND_FROM_EMAIL_DEFAULT}"
+prompt_with_default MAILERSEND_FROM_NAME "MAILERSEND_FROM_NAME sender name" "${MAILERSEND_FROM_NAME_DEFAULT}"
 
 SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}"
 APACHE_CONF_PATH="/etc/apache2/conf-available/${APACHE_CONF_NAME}"
@@ -152,6 +158,9 @@ sudo tee "${ENV_FILE}" >/dev/null <<EOF
 APP_PORT=${APP_PORT}
 APP_BASE_PATH=${APP_BASE_PATH}
 SECRET_KEY=${SECRET_KEY}
+MAILERSEND_API_TOKEN=${MAILERSEND_API_TOKEN}
+MAILERSEND_FROM_EMAIL=${MAILERSEND_FROM_EMAIL}
+MAILERSEND_FROM_NAME=${MAILERSEND_FROM_NAME}
 EOF
 sudo chmod 0640 "${ENV_FILE}"
 sudo chown root:"${APP_GROUP}" "${ENV_FILE}" || true
@@ -201,5 +210,6 @@ echo "Environment file: ${ENV_FILE}"
 echo
 echo "Next steps:"
 echo "  1. Set a real SECRET_KEY in ${ENV_FILE}"
-echo "  2. Restart the service: sudo systemctl restart ${SERVICE_NAME}"
-echo "  3. Verify: curl -I http://127.0.0.1:${APP_PORT}/api/health"
+echo "  2. Set MAILERSEND_API_TOKEN and MAILERSEND_FROM_EMAIL in ${ENV_FILE} if you want task notifications"
+echo "  3. Restart the service: sudo systemctl restart ${SERVICE_NAME}"
+echo "  4. Verify: curl -I http://127.0.0.1:${APP_PORT}/api/health"

@@ -22,6 +22,14 @@ const STATUS_ORDER = {
 };
 
 const TABLE_PAGE_SIZES = [10, 20, 50];
+const emptyProjectForm = {
+  id: null,
+  name: "",
+  member_ids: [],
+  logoFile: null,
+  existing_logo_url: null,
+  remove_logo: false,
+};
 
 function statusLabel(status) {
   return STATUSES.find((item) => item.value === status)?.label ?? status;
@@ -119,6 +127,21 @@ function formatAuditAction(entry) {
   return `${actor} · ${entry.details}`;
 }
 
+function ProjectIdentity({ name, logoUrl, compact = false }) {
+  return (
+    <div className={`project-identity ${compact ? "project-identity-compact" : ""}`}>
+      {logoUrl ? (
+        <img src={logoUrl} alt={`Logo de ${name}`} className="project-logo-mark" />
+      ) : (
+        <span className="project-logo-fallback" aria-hidden="true">
+          {name?.slice(0, 1).toUpperCase() || "P"}
+        </span>
+      )}
+      <span>{name}</span>
+    </div>
+  );
+}
+
 function compareTasksByRecency(left, right) {
   return compareValues(right.updated_at, left.updated_at) || compareValues(right.id, left.id);
 }
@@ -211,32 +234,91 @@ function AttachmentGallery({ attachments, onDelete }) {
   );
 }
 
-function ProjectModal({ open, projectName, creatingProject, onClose, onChange, onSubmit }) {
+function ProjectModal({
+  open,
+  mode,
+  projectForm,
+  users,
+  saving,
+  onClose,
+  onChangeName,
+  onToggleMember,
+  onLogoChange,
+  onToggleRemoveLogo,
+  onSubmit,
+}) {
   if (!open) return null;
+  const title = mode === "edit" ? "Editar proyecto" : "Agregar proyecto";
+  const actionLabel = mode === "edit" ? "Guardar cambios" : "Crear proyecto";
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <section className="modal-card" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <h2>Agregar proyecto</h2>
-            <p>Ingresa el nombre del nuevo proyecto.</p>
+            <h2>{title}</h2>
+            <p>Configura nombre, logo y usuarios vinculados al proyecto.</p>
           </div>
           <button type="button" className="ghost-button" onClick={onClose}>
             Cerrar
           </button>
         </div>
         <form className="stacked-form" onSubmit={onSubmit}>
-          <input
-            type="text"
-            placeholder="Nombre del proyecto"
-            value={projectName}
-            onChange={(event) => onChange(event.target.value)}
-            required
-            autoFocus
-          />
-          <button type="submit" disabled={creatingProject}>
-            {creatingProject ? "Creando..." : "Crear proyecto"}
+          <label className="stacked-field">
+            <span>Nombre</span>
+            <input
+              type="text"
+              placeholder="Nombre del proyecto"
+              value={projectForm.name}
+              onChange={(event) => onChangeName(event.target.value)}
+              required
+              autoFocus
+            />
+          </label>
+          <label className="stacked-field">
+            <span>Logo</span>
+            {(projectForm.logoFile || (projectForm.existing_logo_url && !projectForm.remove_logo)) ? (
+              <div className="project-logo-preview">
+                {projectForm.logoFile ? (
+                  <span>{projectForm.logoFile.name}</span>
+                ) : (
+                  <img src={projectForm.existing_logo_url} alt={`Logo de ${projectForm.name || "proyecto"}`} />
+                )}
+              </div>
+            ) : (
+              <p className="empty-state">Sin logo configurado.</p>
+            )}
+            <input type="file" accept="image/*" onChange={(event) => onLogoChange(event.target.files?.[0] ?? null)} />
+            {projectForm.existing_logo_url ? (
+              <label className="checkbox-row">
+                <input type="checkbox" checked={projectForm.remove_logo} onChange={(event) => onToggleRemoveLogo(event.target.checked)} />
+                <span>Eliminar logo actual</span>
+              </label>
+            ) : null}
+          </label>
+          <fieldset className="member-picker">
+            <legend>Usuarios vinculados</legend>
+            {users.length ? (
+              <div className="member-picker-grid">
+                {users.map((user) => {
+                  const checked = projectForm.member_ids.includes(user.id);
+                  return (
+                    <label key={user.id} className="member-choice">
+                      <input type="checkbox" checked={checked} onChange={() => onToggleMember(user.id)} />
+                      <span>
+                        <strong>{user.username}</strong>
+                        <small>{user.email || "Sin email"}</small>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="empty-state">Todavia no hay usuarios disponibles.</p>
+            )}
+          </fieldset>
+          <button type="submit" disabled={saving}>
+            {saving ? "Guardando..." : actionLabel}
           </button>
         </form>
       </section>
@@ -489,7 +571,9 @@ function TaskTable({ tasks, onOpenTask }) {
                   paginatedTasks.map((task) => (
                     <tr key={task.id} onClick={() => onOpenTask(task)}>
                       <td className="cell-id">#{task.id}</td>
-                      <td>{task.project_name}</td>
+                      <td>
+                        <ProjectIdentity name={task.project_name} logoUrl={task.project_logo_url} compact />
+                      </td>
                       <td className="cell-description">{truncateText(task.description, 140)}</td>
                       <td>
                         <span className={`status-pill status-${task.status}`}>{statusLabel(task.status)}</span>
@@ -556,6 +640,53 @@ function TaskTable({ tasks, onOpenTask }) {
   );
 }
 
+function ProjectTable({ projects, onOpenProject }) {
+  return (
+    <div className="data-table-shell">
+      <div className="data-table-toolbar">
+        <div className="data-table-summary">
+          <h2>Proyectos</h2>
+          <span>{projects.length} proyectos</span>
+          <p className="data-table-note">Haz clic en una fila para editar nombre, logo y usuarios vinculados.</p>
+        </div>
+      </div>
+
+      {projects.length ? (
+        <div className="data-table-scroll">
+          <table className="task-table project-table">
+            <thead>
+              <tr>
+                <th>Proyecto</th>
+                <th>Usuarios vinculados</th>
+                <th>Emails configurados</th>
+                <th>Tareas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projects.map((project) => {
+                const members = project.members || [];
+                const membersWithEmail = members.filter((member) => member.email);
+                return (
+                  <tr key={project.id} onClick={() => onOpenProject(project.id)}>
+                    <td>
+                      <ProjectIdentity name={project.name} logoUrl={project.logo_url} compact />
+                    </td>
+                    <td>{members.length}</td>
+                    <td>{membersWithEmail.length}</td>
+                    <td>{project.task_count ?? 0}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="empty-state">Todavia no hay proyectos.</p>
+      )}
+    </div>
+  );
+}
+
 function TaskCard({
   task,
   onSelect,
@@ -584,7 +715,7 @@ function TaskCard({
       onClick={() => onSelect(task)}
     >
       <div className="task-card-header">
-        <span className="project-name">{task.project_name}</span>
+        <ProjectIdentity name={task.project_name} logoUrl={task.project_logo_url} compact />
         {!isList ? <span className={`status-pill status-${task.status}`}>{statusLabel(task.status)}</span> : null}
       </div>
       {isList ? (
@@ -716,7 +847,7 @@ function TaskDetail({
         <div className="detail-panel-title">
           <div className="detail-header-topline">
             <div className="detail-header-summary">
-              <p className="detail-project-name">{task.project_name}</p>
+              <ProjectIdentity name={task.project_name} logoUrl={task.project_logo_url} />
               <div className="detail-task-heading">
                 <h2>Tarea #{task.id}</h2>
                 <p className="detail-task-meta">
@@ -943,6 +1074,7 @@ function TaskDetail({
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
+  const [users, setUsers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [board, setBoard] = useState(null);
@@ -954,13 +1086,14 @@ export default function App() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [taskForm, setTaskForm] = useState(emptyTaskForm);
   const [taskFiles, setTaskFiles] = useState([]);
-  const [projectName, setProjectName] = useState("");
+  const [projectForm, setProjectForm] = useState(emptyProjectForm);
+  const [projectModalMode, setProjectModalMode] = useState("create");
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [draggingTaskId, setDraggingTaskId] = useState(null);
   const [movingTaskId, setMovingTaskId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [savingTask, setSavingTask] = useState(false);
-  const [creatingProject, setCreatingProject] = useState(false);
+  const [savingProject, setSavingProject] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [error, setError] = useState("");
@@ -985,6 +1118,12 @@ export default function App() {
   const loadProjects = async () => {
     const data = await parseResponse(await fetch(apiPath("/projects")));
     setProjects(data);
+    return data;
+  };
+
+  const loadUsers = async () => {
+    const data = await parseResponse(await fetch(apiPath("/users")));
+    setUsers(data);
     return data;
   };
 
@@ -1039,7 +1178,7 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      const loadedProjects = await loadProjects();
+      const [loadedProjects] = await Promise.all([loadProjects(), loadUsers()]);
       const effectiveProjectId = nextProjectId || loadedProjects[0]?.id || "";
       setSelectedProjectId((current) => current || String(effectiveProjectId || ""));
       await Promise.all([loadTasks(nextFilters), loadBoard(effectiveProjectId)]);
@@ -1111,29 +1250,87 @@ export default function App() {
     [projects],
   );
 
-  const createProject = async (event) => {
+  const openCreateProjectModal = () => {
+    setProjectModalMode("create");
+    setProjectForm({
+      ...emptyProjectForm,
+      member_ids: currentUser ? [currentUser.id] : [],
+    });
+    setIsProjectModalOpen(true);
+  };
+
+  const openEditProjectModal = (projectId) => {
+    const project = projects.find((item) => String(item.id) === String(projectId));
+    if (!project) {
+      setError("Selecciona un proyecto para editarlo");
+      return;
+    }
+    setProjectModalMode("edit");
+    setProjectForm({
+      id: project.id,
+      name: project.name,
+      member_ids: (project.members || []).map((member) => member.id),
+      logoFile: null,
+      existing_logo_url: project.logo_url || null,
+      remove_logo: false,
+    });
+    setIsProjectModalOpen(true);
+  };
+
+  const toggleProjectMember = (userId) => {
+    setProjectForm((current) => ({
+      ...current,
+      member_ids: current.member_ids.includes(userId)
+        ? current.member_ids.filter((memberId) => memberId !== userId)
+        : [...current.member_ids, userId].sort((left, right) => left - right),
+    }));
+  };
+
+  const buildProjectPayload = () => {
+    const formData = new FormData();
+    formData.set(
+      "data",
+      JSON.stringify({
+        name: projectForm.name,
+        member_ids: projectForm.member_ids,
+        remove_logo: projectForm.remove_logo,
+      }),
+    );
+    if (projectForm.logoFile) {
+      formData.set("logo", projectForm.logoFile);
+    }
+    return formData;
+  };
+
+  const submitProject = async (event) => {
     event.preventDefault();
     if (!requireAuth()) return;
-    setCreatingProject(true);
+    setSavingProject(true);
     setError("");
     try {
+      const isEditing = projectModalMode === "edit" && projectForm.id;
       const project = await parseResponse(
-        await fetch(apiPath("/projects"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: projectName }),
+        await fetch(apiPath(isEditing ? `/projects/${projectForm.id}` : "/projects"), {
+          method: isEditing ? "PATCH" : "POST",
+          body: buildProjectPayload(),
         }),
       );
-      setProjectName("");
-      const nextProjects = [...projects, project].sort((a, b) => a.name.localeCompare(b.name));
+      const nextProjects = isEditing
+        ? projects.map((item) => (item.id === project.id ? project : item)).sort((a, b) => a.name.localeCompare(b.name))
+        : [...projects, project].sort((a, b) => a.name.localeCompare(b.name));
       setProjects(nextProjects);
       setSelectedProjectId(String(project.id));
       setTaskForm((current) => ({ ...current, project_id: String(project.id) }));
+      setProjectForm(emptyProjectForm);
       setIsProjectModalOpen(false);
+      await Promise.all([loadTasks(filters), loadBoard(selectedProjectId || project.id)]);
+      if (selectedTaskId) {
+        await loadSelectedTask(selectedTaskId);
+      }
     } catch (nextError) {
       setError(nextError.message);
     } finally {
-      setCreatingProject(false);
+      setSavingProject(false);
     }
   };
 
@@ -1406,7 +1603,9 @@ export default function App() {
       setSelectedTask(null);
       setBoard(null);
       setTasks([]);
+      setUsers([]);
       setProjects([]);
+      setProjectForm(emptyProjectForm);
       syncSelectedTaskInUrl(null);
     } catch (nextError) {
       setError(nextError.message);
@@ -1444,14 +1643,32 @@ export default function App() {
 
       <ProjectModal
         open={isProjectModalOpen}
-        projectName={projectName}
-        creatingProject={creatingProject}
+        mode={projectModalMode}
+        projectForm={projectForm}
+        users={users}
+        saving={savingProject}
         onClose={() => {
-          if (creatingProject) return;
+          if (savingProject) return;
           setIsProjectModalOpen(false);
+          setProjectForm(emptyProjectForm);
         }}
-        onChange={setProjectName}
-        onSubmit={createProject}
+        onChangeName={(value) => setProjectForm((current) => ({ ...current, name: value }))}
+        onToggleMember={toggleProjectMember}
+        onLogoChange={(file) =>
+          setProjectForm((current) => ({
+            ...current,
+            logoFile: file,
+            remove_logo: file ? false : current.remove_logo,
+          }))
+        }
+        onToggleRemoveLogo={(checked) =>
+          setProjectForm((current) => ({
+            ...current,
+            remove_logo: checked,
+            logoFile: checked ? null : current.logoFile,
+          }))
+        }
+        onSubmit={submitProject}
       />
 
       <header className="topbar">
@@ -1481,12 +1698,18 @@ export default function App() {
               <button className={view === "board" ? "active" : ""} onClick={() => switchView("board")}>
                 Kanban
               </button>
+              <button className={view === "projects" ? "active" : ""} onClick={() => switchView("projects")}>
+                Proyectos
+              </button>
             </div>
           </div>
           <div className="toolbar-actions">
             <div className="project-form">
-              <button type="button" onClick={() => setIsProjectModalOpen(true)}>
+              <button type="button" onClick={openCreateProjectModal}>
                 Agregar proyecto
+              </button>
+              <button type="button" className="ghost-button" onClick={() => switchView("projects")} disabled={!projects.length}>
+                Editar proyectos
               </button>
             </div>
             <details className="user-menu">
@@ -1572,9 +1795,9 @@ export default function App() {
               {loading ? (
                 <p className="empty-state">Cargando...</p>
               ) : view === "list" ? (
-                <>
-                  <TaskTable tasks={tasks} onOpenTask={openTask} />
-                </>
+                <TaskTable tasks={tasks} onOpenTask={openTask} />
+              ) : view === "projects" ? (
+                <ProjectTable projects={projects} onOpenProject={openEditProjectModal} />
               ) : (
                 <>
                   <div className="panel-header">

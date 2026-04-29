@@ -144,6 +144,12 @@ button {
   padding: 0.8rem 1.2rem;
 }
 
+.project-form .ghost-button {
+  border: 1px solid var(--panel-border);
+  background: white;
+  color: #111827;
+}
+
 .view-switch button {
   background: rgba(31, 41, 55, 0.14);
   color: rgba(31, 41, 55, 0.68);
@@ -260,6 +266,7 @@ textarea {
 
 .filter-row input,
 .project-form input,
+.project-form select,
 .filter-row select,
 .project-form button,
 .filter-row .view-switch {
@@ -274,6 +281,11 @@ textarea {
 .project-form input {
   min-width: 12rem;
   flex: 1 1 12rem;
+}
+
+.project-form select {
+  width: auto;
+  min-width: 15rem;
 }
 
 .user-menu {
@@ -448,6 +460,54 @@ textarea {
   text-transform: uppercase;
 }
 
+.project-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  color: inherit;
+}
+
+.project-identity span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-identity-compact {
+  gap: 0.55rem;
+}
+
+.project-logo-mark,
+.project-logo-fallback {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.75rem;
+  flex: 0 0 auto;
+}
+
+.project-logo-mark {
+  object-fit: cover;
+  border: 1px solid rgba(26, 32, 44, 0.08);
+  background: white;
+}
+
+.project-logo-fallback {
+  display: inline-grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(190, 91, 45, 0.16), rgba(17, 24, 39, 0.1));
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.project-identity-compact .project-logo-mark,
+.project-identity-compact .project-logo-fallback {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 0.6rem;
+}
+
 .detail-task-meta {
   font-size: 0.95rem;
   color: #4b5563;
@@ -500,6 +560,18 @@ textarea {
 .detail-section {
   display: grid;
   gap: 0.9rem;
+}
+
+.stacked-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.stacked-field > span,
+.member-picker legend {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #374151;
 }
 
 .task-card,
@@ -608,6 +680,62 @@ textarea {
 .data-table-shell {
   display: grid;
   gap: 1rem;
+}
+
+.project-logo-preview {
+  display: grid;
+  place-items: center;
+  min-height: 7rem;
+  padding: 0.9rem;
+  border: 1px dashed rgba(26, 32, 44, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.project-logo-preview img {
+  max-width: 100%;
+  max-height: 8rem;
+  border-radius: 16px;
+  object-fit: contain;
+}
+
+.checkbox-row,
+.member-choice {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.checkbox-row input,
+.member-choice input {
+  width: auto;
+  margin-top: 0.2rem;
+}
+
+.member-picker {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid rgba(26, 32, 44, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.member-picker-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.member-choice span {
+  display: grid;
+}
+
+.member-choice strong,
+.member-choice small {
+  line-height: 1.35;
+}
+
+.member-choice small {
+  color: #6b7280;
 }
 
 .data-table-toolbar,
