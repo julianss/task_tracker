@@ -252,6 +252,7 @@ function TaskTable({ tasks, onOpenTask }) {
     status: "",
     created_at: "",
     updated_at: "",
+    last_updated_by: "",
   });
   const [sortConfig, setSortConfig] = useState({ key: "updated_at", direction: "desc" });
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZES[0]);
@@ -275,6 +276,12 @@ function TaskTable({ tasks, onOpenTask }) {
         return false;
       }
       if (normalizedFilters.updated_at && !String(task.updated_at ?? "").toLowerCase().includes(normalizedFilters.updated_at)) {
+        return false;
+      }
+      if (
+        normalizedFilters.last_updated_by &&
+        !String(task.last_updated_by ?? "").toLowerCase().includes(normalizedFilters.last_updated_by)
+      ) {
         return false;
       }
       return true;
@@ -303,6 +310,9 @@ function TaskTable({ tasks, onOpenTask }) {
           break;
         case "updated_at":
           comparison = compareValues(left.updated_at, right.updated_at);
+          break;
+        case "last_updated_by":
+          comparison = compareValues(left.last_updated_by, right.last_updated_by);
           break;
         default:
           comparison = 0;
@@ -336,7 +346,7 @@ function TaskTable({ tasks, onOpenTask }) {
       if (current.key === key) {
         return { key, direction: current.direction === "asc" ? "desc" : "asc" };
       }
-      return { key, direction: "asc" };
+      return { key, direction: key === "updated_at" ? "desc" : "asc" };
     });
   };
 
@@ -357,6 +367,7 @@ function TaskTable({ tasks, onOpenTask }) {
           <span>
             {sortedTasks.length} de {tasks.length} tareas
           </span>
+          <p className="data-table-note">Orden predeterminado: ultima actualizacion, del cambio mas reciente al mas antiguo.</p>
         </div>
         <label className="page-size-control">
           <span>Filas por pagina</span>
@@ -403,7 +414,12 @@ function TaskTable({ tasks, onOpenTask }) {
                   </th>
                   <th>
                     <button type="button" className="sort-button" onClick={() => toggleSort("updated_at")}>
-                      Actualizada <span>{sortIndicator("updated_at")}</span>
+                      Ultima actualizacion <span>{sortIndicator("updated_at")}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="sort-button" onClick={() => toggleSort("last_updated_by")}>
+                      Ultimo cambio por <span>{sortIndicator("last_updated_by")}</span>
                     </button>
                   </th>
                 </tr>
@@ -458,6 +474,14 @@ function TaskTable({ tasks, onOpenTask }) {
                       onChange={(event) => updateFilter("updated_at", event.target.value)}
                     />
                   </th>
+                  <th>
+                    <input
+                      type="search"
+                      placeholder="Usuario"
+                      value={columnFilters.last_updated_by}
+                      onChange={(event) => updateFilter("last_updated_by", event.target.value)}
+                    />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -472,11 +496,12 @@ function TaskTable({ tasks, onOpenTask }) {
                       </td>
                       <td>{formatTableDate(task.created_at)}</td>
                       <td>{formatTableDate(task.updated_at)}</td>
+                      <td>{task.last_updated_by || "Sin registro"}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="empty-state data-table-empty">
+                    <td colSpan="7" className="empty-state data-table-empty">
                       Ninguna tarea coincide con los filtros de la tabla.
                     </td>
                   </tr>

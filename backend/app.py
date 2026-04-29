@@ -203,6 +203,22 @@ def fetch_checklist_items(db: sqlite3.Connection, task_id: int) -> list[dict]:
     return items
 
 
+def hydrate_task(db: sqlite3.Connection, task: dict) -> dict:
+    task_id = task["id"]
+    task["attachments"] = fetch_attachments(db, task_id=task_id)
+    task["comments"] = fetch_comments(db, task_id)
+    task["checklist_items"] = fetch_checklist_items(db, task_id)
+    task["audit_logs"] = fetch_audit_logs(db, task_id)
+    latest_audit = next((entry for entry in task["audit_logs"] if entry.get("username")), None)
+    task["last_updated_by"] = latest_audit["username"] if latest_audit else None
+    if task["checklist_items"]:
+        completed = sum(1 for item in task["checklist_items"] if item["is_done"])
+        task["progress_percent"] = round((completed / len(task["checklist_items"])) * 100)
+    else:
+        task["progress_percent"] = None
+    return task
+
+
 def fetch_task(db: sqlite3.Connection, task_id: int) -> dict:
     row = db.execute(
         """
@@ -215,17 +231,7 @@ def fetch_task(db: sqlite3.Connection, task_id: int) -> dict:
     ).fetchone()
     if row is None:
         abort(404, description="No se encontro la tarea")
-    task = row_to_dict(row)
-    task["attachments"] = fetch_attachments(db, task_id=task_id)
-    task["comments"] = fetch_comments(db, task_id)
-    task["checklist_items"] = fetch_checklist_items(db, task_id)
-    task["audit_logs"] = fetch_audit_logs(db, task_id)
-    if task["checklist_items"]:
-        completed = sum(1 for item in task["checklist_items"] if item["is_done"])
-        task["progress_percent"] = round((completed / len(task["checklist_items"])) * 100)
-    else:
-        task["progress_percent"] = None
-    return task
+    return hydrate_task(db, row_to_dict(row))
 
 
 def fetch_audit_logs(db: sqlite3.Connection, task_id: int) -> list[dict]:
@@ -460,20 +466,7 @@ def list_tasks():
             """,
             params,
         ).fetchall()
-        tasks = []
-        for row in rows:
-            task = row_to_dict(row)
-            task["attachments"] = fetch_attachments(db, task_id=task["id"])
-            task["comments"] = fetch_comments(db, task["id"])
-            task["checklist_items"] = fetch_checklist_items(db, task["id"])
-            task["audit_logs"] = fetch_audit_logs(db, task["id"])
-            if task["checklist_items"]:
-                completed = sum(1 for item in task["checklist_items"] if item["is_done"])
-                task["progress_percent"] = round((completed / len(task["checklist_items"])) * 100)
-            else:
-                task["progress_percent"] = None
-            tasks.append(task)
-        return jsonify(tasks)
+        return jsonify([hydrate_task(db, row_to_dict(row)) for row in rows])
 
 
 @app.get("/api/tasks/<int:task_id>")
@@ -734,16 +727,7 @@ def project_board(project_id: int):
         ).fetchall()
         columns = {status: [] for status in STATUSES}
         for row in rows:
-            task = row_to_dict(row)
-            task["attachments"] = fetch_attachments(db, task_id=task["id"])
-            task["comments"] = fetch_comments(db, task["id"])
-            task["checklist_items"] = fetch_checklist_items(db, task["id"])
-            task["audit_logs"] = fetch_audit_logs(db, task["id"])
-            if task["checklist_items"]:
-                completed = sum(1 for item in task["checklist_items"] if item["is_done"])
-                task["progress_percent"] = round((completed / len(task["checklist_items"])) * 100)
-            else:
-                task["progress_percent"] = None
+            task = hydrate_task(db, row_to_dict(row))
             columns.setdefault(task["status"], columns["todo"]).append(task)
         return jsonify(
             {
