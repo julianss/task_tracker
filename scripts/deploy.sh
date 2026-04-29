@@ -2,6 +2,17 @@
 
 set -euo pipefail
 
+MODE="full"
+if [[ "${1:-}" == "--env-only" ]]; then
+  MODE="env-only"
+  shift
+elif [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  echo "Usage: $0 [--env-only]"
+  echo
+  echo "  --env-only   Update only the environment file and restart the service."
+  exit 0
+fi
+
 prompt_with_default() {
   local __var_name="$1"
   local prompt_label="$2"
@@ -135,6 +146,34 @@ echo "  app dir: ${APP_DIR}"
 echo "  app user: ${APP_USER}:${APP_GROUP}"
 echo "  bind: 127.0.0.1:${APP_PORT}"
 echo "  base path: ${APP_BASE_PATH}"
+echo "  mode: ${MODE}"
+
+write_env_file() {
+  sudo tee "${ENV_FILE}" >/dev/null <<EOF
+APP_PORT=${APP_PORT}
+APP_BASE_PATH=${APP_BASE_PATH}
+SECRET_KEY=${SECRET_KEY}
+MAILERSEND_API_TOKEN=${MAILERSEND_API_TOKEN}
+MAILERSEND_FROM_EMAIL=${MAILERSEND_FROM_EMAIL}
+MAILERSEND_FROM_NAME=${MAILERSEND_FROM_NAME}
+EOF
+  sudo chmod 0640 "${ENV_FILE}"
+  sudo chown root:"${APP_GROUP}" "${ENV_FILE}" || true
+}
+
+if [[ "${MODE}" == "env-only" ]]; then
+  write_env_file
+  sudo systemctl restart "${SERVICE_NAME}"
+  echo
+  echo "Environment update complete."
+  echo "Service: ${SERVICE_NAME}"
+  echo "Environment file: ${ENV_FILE}"
+  echo
+  echo "Next steps:"
+  echo "  1. Verify: sudo systemctl status ${SERVICE_NAME}"
+  echo "  2. Check app health: curl -I http://127.0.0.1:${APP_PORT}/api/health"
+  exit 0
+fi
 
 sudo install -d -m 0755 -o "$APP_USER" -g "$APP_GROUP" "${APP_DIR}/data" "${APP_DIR}/data/uploads"
 
@@ -154,16 +193,7 @@ fi
 echo "Building frontend bundle"
 TASK_TRACKER_BASE_PATH="${APP_BASE_PATH}" "$NPM_BIN" run build --prefix "${APP_DIR}"
 
-sudo tee "${ENV_FILE}" >/dev/null <<EOF
-APP_PORT=${APP_PORT}
-APP_BASE_PATH=${APP_BASE_PATH}
-SECRET_KEY=${SECRET_KEY}
-MAILERSEND_API_TOKEN=${MAILERSEND_API_TOKEN}
-MAILERSEND_FROM_EMAIL=${MAILERSEND_FROM_EMAIL}
-MAILERSEND_FROM_NAME=${MAILERSEND_FROM_NAME}
-EOF
-sudo chmod 0640 "${ENV_FILE}"
-sudo chown root:"${APP_GROUP}" "${ENV_FILE}" || true
+write_env_file
 
 sudo tee "${SERVICE_PATH}" >/dev/null <<EOF
 [Unit]
