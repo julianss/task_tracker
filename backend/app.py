@@ -458,6 +458,19 @@ def mailersend_enabled() -> bool:
     return bool(MAILERSEND_API_TOKEN and MAILERSEND_FROM_EMAIL)
 
 
+def log_startup_configuration() -> None:
+    print(
+        (
+            "Startup configuration: "
+            f"APP_BASE_PATH={APP_BASE_PATH!r}; "
+            f"MAILERSEND_API_TOKEN={'set' if bool(MAILERSEND_API_TOKEN) else 'missing'}; "
+            f"MAILERSEND_FROM_EMAIL={'set' if bool(MAILERSEND_FROM_EMAIL) else 'missing'}; "
+            f"MAILERSEND_FROM_NAME={'set' if bool(MAILERSEND_FROM_NAME) else 'missing'}"
+        ),
+        file=sys.stderr,
+    )
+
+
 def send_mailersend_email(*, recipients: list[dict], subject: str, text: str, html: str) -> None:
     if not recipients or not mailersend_enabled():
         return
@@ -1129,6 +1142,7 @@ def frontend(path: str):
 
 
 init_db()
+log_startup_configuration()
 
 
 if __name__ == "__main__":

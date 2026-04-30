@@ -206,7 +206,8 @@ User=${APP_USER}
 Group=${APP_GROUP}
 WorkingDirectory=${APP_DIR}
 EnvironmentFile=${ENV_FILE}
-ExecStart=${VENV_DIR}/bin/gunicorn --bind 127.0.0.1:\${APP_PORT} --workers 2 --threads 4 backend.app:app
+Environment=PYTHONUNBUFFERED=1
+ExecStart=${VENV_DIR}/bin/gunicorn --bind 127.0.0.1:\${APP_PORT} --workers 2 --threads 4 --access-logfile - --error-logfile - --capture-output backend.app:app
 Restart=always
 RestartSec=5
 
