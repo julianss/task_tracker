@@ -1741,9 +1741,6 @@ export default function App() {
               <button type="button" onClick={openCreateProjectModal}>
                 Agregar proyecto
               </button>
-              <button type="button" className="ghost-button" onClick={() => switchView("projects")} disabled={!projects.length}>
-                Editar proyectos
-              </button>
             </div>
             <details className="user-menu">
               <summary className="user-menu-trigger">
