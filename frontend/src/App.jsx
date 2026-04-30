@@ -64,8 +64,8 @@ function getProjectProgress(project) {
   const pending = Number(project?.pending_count) || 0;
   const done = Math.max(0, total - pending);
   const donePercent = total > 0 ? Math.round((done / total) * 100) : 0;
-  const tone = donePercent >= 50 ? "good" : donePercent >= 30 ? "warn" : "bad";
-  return { total, pending, done, donePercent, tone };
+  const tone = total === 0 ? "neutral" : donePercent > 50 ? "good" : donePercent >= 30 ? "warn" : "bad";
+  return { total, pending, done, donePercent, tone, hasTasks: total > 0 };
 }
 
 function formatTableDate(value) {
@@ -679,22 +679,28 @@ function ProjectTable({ projects, onOpenProject }) {
                 const membersWithEmail = members.filter((member) => member.email);
                 const progress = getProjectProgress(project);
                 return (
-                  <tr key={project.id} onClick={() => onOpenProject(project.id)}>
+                  <tr
+                    key={project.id}
+                    className={progress.hasTasks ? `project-row project-row-${progress.tone}` : "project-row"}
+                    onClick={() => onOpenProject(project.id)}
+                  >
                     <td>
                       <ProjectIdentity name={project.name} logoUrl={project.logo_url} compact />
                     </td>
                     <td>
                       <div className="project-progress-cell">
                         <div className="project-progress-meta">
-                          <span>{progress.donePercent}%</span>
-                          <small>{progress.pending}/{progress.total} pendientes</small>
+                          <span>{progress.hasTasks ? `${progress.donePercent}%` : "Sin tareas"}</span>
+                          <small>{progress.hasTasks ? `${progress.pending}/${progress.total} pendientes` : ""}</small>
                         </div>
-                        <div className="project-progress-track" aria-hidden="true">
-                          <span
-                            className={`project-progress-fill project-progress-${progress.tone}`}
-                            style={{ width: `${progress.donePercent}%` }}
-                          />
-                        </div>
+                        {progress.hasTasks ? (
+                          <div className="project-progress-track" aria-hidden="true">
+                            <span
+                              className={`project-progress-fill project-progress-${progress.tone}`}
+                              style={{ width: `${progress.donePercent}%` }}
+                            />
+                          </div>
+                        ) : null}
                       </div>
                     </td>
                     <td>{project.task_count ?? 0}</td>
