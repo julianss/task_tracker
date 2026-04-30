@@ -59,6 +59,15 @@ function formatChecklistSummary(task) {
   return progress ? `${checklistItems.length} subtareas, ${progress} completado` : `${checklistItems.length} subtareas`;
 }
 
+function getProjectProgress(project) {
+  const total = Number(project?.task_count) || 0;
+  const pending = Number(project?.pending_count) || 0;
+  const done = Math.max(0, total - pending);
+  const donePercent = total > 0 ? Math.round((done / total) * 100) : 0;
+  const tone = donePercent >= 50 ? "good" : donePercent >= 30 ? "warn" : "bad";
+  return { total, pending, done, donePercent, tone };
+}
+
 function formatTableDate(value) {
   if (!value) return "Sin fecha";
   return new Date(value).toLocaleString("es-MX", {
@@ -657,23 +666,41 @@ function ProjectTable({ projects, onOpenProject }) {
             <thead>
               <tr>
                 <th>Proyecto</th>
-                <th>Usuarios vinculados</th>
-                <th>Emails configurados</th>
-                <th>Tareas</th>
+                <th>📈 Progreso</th>
+                <th>📋 Tareas</th>
+                <th>⏳ Pendientes</th>
+                <th title="Usuarios vinculados">👥</th>
+                <th title="Emails configurados">✉️</th>
               </tr>
             </thead>
             <tbody>
               {projects.map((project) => {
                 const members = project.members || [];
                 const membersWithEmail = members.filter((member) => member.email);
+                const progress = getProjectProgress(project);
                 return (
                   <tr key={project.id} onClick={() => onOpenProject(project.id)}>
                     <td>
                       <ProjectIdentity name={project.name} logoUrl={project.logo_url} compact />
                     </td>
+                    <td>
+                      <div className="project-progress-cell">
+                        <div className="project-progress-meta">
+                          <span>{progress.donePercent}%</span>
+                          <small>{progress.pending}/{progress.total} pendientes</small>
+                        </div>
+                        <div className="project-progress-track" aria-hidden="true">
+                          <span
+                            className={`project-progress-fill project-progress-${progress.tone}`}
+                            style={{ width: `${progress.donePercent}%` }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    <td>{project.task_count ?? 0}</td>
+                    <td>{project.pending_count ?? 0}</td>
                     <td>{members.length}</td>
                     <td>{membersWithEmail.length}</td>
-                    <td>{project.task_count ?? 0}</td>
                   </tr>
                 );
               })}
@@ -1730,7 +1757,7 @@ export default function App() {
       </header>
 
       <main
-        className={`layout ${view === "board" ? "layout-board" : ""} ${selectedTaskId ? "layout-task-open" : ""}`}
+        className={`layout ${view === "board" || view === "projects" ? "layout-board" : ""} ${selectedTaskId ? "layout-task-open" : ""}`}
       >
         {selectedTaskId ? (
         <TaskDetail

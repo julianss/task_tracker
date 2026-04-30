@@ -227,7 +227,10 @@ def hydrate_project(db: sqlite3.Connection, project: dict) -> dict:
 def fetch_project(db: sqlite3.Connection, project_id: int) -> dict:
     row = db.execute(
         """
-        SELECT projects.*, COUNT(tasks.id) AS task_count
+        SELECT
+            projects.*,
+            COUNT(tasks.id) AS task_count,
+            SUM(CASE WHEN tasks.status IS NOT NULL AND tasks.status != 'done' THEN 1 ELSE 0 END) AS pending_count
         FROM projects
         LEFT JOIN tasks ON tasks.project_id = projects.id
         WHERE projects.id = ?
@@ -674,7 +677,10 @@ def list_projects():
     with closing(get_db()) as db:
         rows = db.execute(
             """
-            SELECT projects.*, COUNT(tasks.id) AS task_count
+            SELECT
+                projects.*,
+                COUNT(tasks.id) AS task_count,
+                SUM(CASE WHEN tasks.status IS NOT NULL AND tasks.status != 'done' THEN 1 ELSE 0 END) AS pending_count
             FROM projects
             LEFT JOIN tasks ON tasks.project_id = projects.id
             GROUP BY projects.id
