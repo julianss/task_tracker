@@ -671,6 +671,7 @@ function ProjectTable({ projects, onOpenProject }) {
                 <th>⏳ Pendientes</th>
                 <th title="Usuarios vinculados">👥</th>
                 <th title="Emails configurados">✉️</th>
+                <th title="Días desde el último cambio en una tarea">🕐 Último cambio</th>
               </tr>
             </thead>
             <tbody>
@@ -678,6 +679,9 @@ function ProjectTable({ projects, onOpenProject }) {
                 const members = project.members || [];
                 const membersWithEmail = members.filter((member) => member.email);
                 const progress = getProjectProgress(project);
+                const daysSinceLastChange = project.last_task_update
+                  ? Math.floor((Date.now() - new Date(project.last_task_update).getTime()) / 86400000)
+                  : null;
                 return (
                   <tr
                     key={project.id}
@@ -707,6 +711,15 @@ function ProjectTable({ projects, onOpenProject }) {
                     <td>{project.pending_count ?? 0}</td>
                     <td>{members.length}</td>
                     <td>{membersWithEmail.length}</td>
+                    <td title={project.last_task_update ? `Último cambio: ${formatTableDate(project.last_task_update)}` : "Sin tareas"}>
+                      {daysSinceLastChange === null
+                        ? "—"
+                        : daysSinceLastChange === 0
+                        ? "Hoy"
+                        : daysSinceLastChange === 1
+                        ? "Ayer"
+                        : `Hace ${daysSinceLastChange} días`}
+                    </td>
                   </tr>
                 );
               })}

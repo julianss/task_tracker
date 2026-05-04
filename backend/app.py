@@ -693,7 +693,8 @@ def list_projects():
             SELECT
                 projects.*,
                 COUNT(tasks.id) AS task_count,
-                SUM(CASE WHEN tasks.status IS NOT NULL AND tasks.status != 'done' THEN 1 ELSE 0 END) AS pending_count
+                SUM(CASE WHEN tasks.status IS NOT NULL AND tasks.status != 'done' THEN 1 ELSE 0 END) AS pending_count,
+                MAX(tasks.updated_at) AS last_task_update
             FROM projects
             LEFT JOIN tasks ON tasks.project_id = projects.id
             GROUP BY projects.id
