@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import logging.handlers
 import mimetypes
 import os
 import sqlite3
@@ -26,8 +28,35 @@ APP_BASE_PATH = os.environ.get("APP_BASE_PATH", "/").strip() or "/"
 MAILERSEND_API_TOKEN = os.environ.get("MAILERSEND_API_TOKEN", "").strip()
 MAILERSEND_FROM_EMAIL = os.environ.get("MAILERSEND_FROM_EMAIL", "").strip()
 MAILERSEND_FROM_NAME = os.environ.get("MAILERSEND_FROM_NAME", "Task Tracker").strip() or "Task Tracker"
+LOG_PATH = Path(os.environ.get("LOG_PATH", "/var/log/task_tracker.log"))
+LOG_MAX_BYTES = 5 * 1024 * 1024  # 5 MB per file; backupCount=1 keeps at most 10 MB total
 
 STATUSES = ["todo", "in_progress", "testing", "done"]
+
+
+def configure_logging() -> None:
+    formatter = logging.Formatter(
+        "%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+    try:
+        handler: logging.Handler = logging.handlers.RotatingFileHandler(
+            LOG_PATH,
+            maxBytes=LOG_MAX_BYTES,
+            backupCount=1,
+        )
+    except (PermissionError, OSError):
+        handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(formatter)
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.addHandler(handler)
+    # Silence noisy libraries
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+
+configure_logging()
+logger = logging.getLogger(__name__)
 
 
 def normalize_base_path(value: str) -> str:
@@ -459,15 +488,12 @@ def mailersend_enabled() -> bool:
 
 
 def log_startup_configuration() -> None:
-    print(
-        (
-            "Startup configuration: "
-            f"APP_BASE_PATH={APP_BASE_PATH!r}; "
-            f"MAILERSEND_API_TOKEN={'set' if bool(MAILERSEND_API_TOKEN) else 'missing'}; "
-            f"MAILERSEND_FROM_EMAIL={'set' if bool(MAILERSEND_FROM_EMAIL) else 'missing'}; "
-            f"MAILERSEND_FROM_NAME={'set' if bool(MAILERSEND_FROM_NAME) else 'missing'}"
-        ),
-        file=sys.stderr,
+    logger.info(
+        "Startup configuration: "
+        f"APP_BASE_PATH={APP_BASE_PATH!r}; "
+        f"MAILERSEND_API_TOKEN={'set' if bool(MAILERSEND_API_TOKEN) else 'missing'}; "
+        f"MAILERSEND_FROM_EMAIL={'set' if bool(MAILERSEND_FROM_EMAIL) else 'missing'}; "
+        f"MAILERSEND_FROM_NAME={'set' if bool(MAILERSEND_FROM_NAME) else 'missing'}"
     )
 
 
@@ -498,23 +524,17 @@ def send_mailersend_email(*, recipients: list[dict], subject: str, text: str, ht
         },
         method="POST",
     )
-    print(
-        (
-            "MailerSend notification request prepared; "
-            "url='https://api.mailersend.com/v1/email'; "
-            f"authorization='Bearer {masked_token}'; "
-            "user_agent='task-tracker-mailersend/1.0'; "
-            f"from={MAILERSEND_FROM_EMAIL!r}; recipients={recipient_emails!r}; subject={subject!r}"
-        ),
-        file=sys.stderr,
+    logger.info(
+        "MailerSend notification request prepared; "
+        "url='https://api.mailersend.com/v1/email'; "
+        f"authorization='Bearer {masked_token}'; "
+        "user_agent='task-tracker-mailersend/1.0'; "
+        f"from={MAILERSEND_FROM_EMAIL!r}; recipients={recipient_emails!r}; subject={subject!r}"
     )
     with urllib_request.urlopen(request_data, timeout=15):
-        print(
-            (
-                f"MailerSend notification sent successfully; from={MAILERSEND_FROM_EMAIL!r}; "
-                f"recipients={recipient_emails!r}; subject={subject!r}"
-            ),
-            file=sys.stderr,
+        logger.info(
+            f"MailerSend notification sent successfully; from={MAILERSEND_FROM_EMAIL!r}; "
+            f"recipients={recipient_emails!r}; subject={subject!r}"
         )
         return
 
@@ -530,13 +550,10 @@ def notify_task_change(
     extra_html: str | None = None,
 ) -> None:
     if not mailersend_enabled():
-        print(
-            (
-                f"MailerSend notification skipped for task {task_id}: "
-                f"MAILERSEND_API_TOKEN={'set' if bool(MAILERSEND_API_TOKEN) else 'missing'}, "
-                f"MAILERSEND_FROM_EMAIL={'set' if bool(MAILERSEND_FROM_EMAIL) else 'missing'}"
-            ),
-            file=sys.stderr,
+        logger.info(
+            f"MailerSend notification skipped for task {task_id}: "
+            f"MAILERSEND_API_TOKEN={'set' if bool(MAILERSEND_API_TOKEN) else 'missing'}, "
+            f"MAILERSEND_FROM_EMAIL={'set' if bool(MAILERSEND_FROM_EMAIL) else 'missing'}"
         )
         return
     task = fetch_task(db, task_id)
@@ -551,12 +568,9 @@ def notify_task_change(
             recipients_by_email[email.lower()] = {"email": email, "name": member["username"]}
     recipients = list(recipients_by_email.values())
     if not recipients:
-        print(
-            (
-                f"MailerSend notification skipped for task {task_id}: no recipients with email "
-                f"for project_ids={project_ids}"
-            ),
-            file=sys.stderr,
+        logger.info(
+            f"MailerSend notification skipped for task {task_id}: no recipients with email "
+            f"for project_ids={project_ids}"
         )
         return
     recipient_emails = [recipient.get("email", "") for recipient in recipients]
@@ -600,21 +614,15 @@ def notify_task_change(
             response_headers = dict(exc.headers.items())
         except Exception:
             response_headers = {"error": "<unable to read response headers>"}
-        print(
-            (
-                f"MailerSend notification failed for task {task_id}: {exc}; "
-                f"from={MAILERSEND_FROM_EMAIL!r}; recipients={recipient_emails!r}; "
-                f"headers={response_headers!r}; response={response_body}"
-            ),
-            file=sys.stderr,
+        logger.error(
+            f"MailerSend notification failed for task {task_id}: {exc}; "
+            f"from={MAILERSEND_FROM_EMAIL!r}; recipients={recipient_emails!r}; "
+            f"headers={response_headers!r}; response={response_body}"
         )
     except (urllib_error.URLError, TimeoutError) as exc:
-        print(
-            (
-                f"MailerSend notification failed for task {task_id}: {exc}; "
-                f"from={MAILERSEND_FROM_EMAIL!r}; recipients={recipient_emails!r}"
-            ),
-            file=sys.stderr,
+        logger.error(
+            f"MailerSend notification failed for task {task_id}: {exc}; "
+            f"from={MAILERSEND_FROM_EMAIL!r}; recipients={recipient_emails!r}"
         )
 
 
