@@ -353,7 +353,7 @@ function TaskTable({ tasks, onOpenTask, initialFilters }) {
 
   const filteredTasks = useMemo(() => {
     const normalizedFilters = Object.fromEntries(
-      Object.entries(columnFilters).map(([key, value]) => [key, value.trim().toLowerCase()]),
+      Object.entries(columnFilters).map(([key, value]) => [key, typeof value === "string" ? value.trim().toLowerCase() : value]),
     );
 
     return tasks.filter((task) => {
