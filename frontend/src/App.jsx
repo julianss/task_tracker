@@ -1134,6 +1134,146 @@ function TaskDetail({
   );
 }
 
+function MailChecker() {
+  const [config, setConfig] = useState(null);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+  const [toEmail, setToEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
+  const [sendError, setSendError] = useState(null);
+
+  useEffect(() => {
+    setLoadingConfig(true);
+    fetch(apiPath("/admin/mail-check"))
+      .then((r) => r.json())
+      .then((data) => setConfig(data.config))
+      .catch(() => setConfig(null))
+      .finally(() => setLoadingConfig(false));
+  }, []);
+
+  const sendTest = async (event) => {
+    event.preventDefault();
+    setSending(true);
+    setSendResult(null);
+    setSendError(null);
+    try {
+      const response = await fetch(apiPath("/admin/mail-check"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to_email: toEmail }),
+      });
+      const data = await response.json();
+      setSendResult(data.send_result);
+      if (data.config) setConfig(data.config);
+    } catch (err) {
+      setSendError(err.message || "Error al enviar");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <section className="panel main-panel mail-checker">
+      <div className="panel-header">
+        <h2>Verificar correo</h2>
+      </div>
+
+      <div className="mail-checker-body">
+        <h3>Configuracion</h3>
+        {loadingConfig ? (
+          <p className="empty-state">Cargando configuracion...</p>
+        ) : !config ? (
+          <p className="mail-checker-error">No se pudo cargar la configuracion.</p>
+        ) : (
+          <table className="mail-checker-config-table">
+            <tbody>
+              <tr>
+                <th>Estado general</th>
+                <td>
+                  <span className={`mail-checker-badge ${config.enabled ? "badge-ok" : "badge-error"}`}>
+                    {config.enabled ? "Habilitado" : "Deshabilitado"}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <th>MAILERSEND_API_TOKEN</th>
+                <td>
+                  <span className={`mail-checker-badge ${config.token_set ? "badge-ok" : "badge-error"}`}>
+                    {config.token_set ? "Configurado" : "Falta"}
+                  </span>
+                  {config.token_set && (
+                    <code className="mail-checker-code">{config.token_preview}</code>
+                  )}
+                </td>
+              </tr>
+              <tr>
+                <th>MAILERSEND_FROM_EMAIL</th>
+                <td>
+                  {config.from_email ? (
+                    <code className="mail-checker-code">{config.from_email}</code>
+                  ) : (
+                    <span className="mail-checker-badge badge-error">Falta</span>
+                  )}
+                </td>
+              </tr>
+              <tr>
+                <th>MAILERSEND_FROM_NAME</th>
+                <td>
+                  <code className="mail-checker-code">{config.from_name || "(vacio)"}</code>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        )}
+
+        <h3>Enviar correo de prueba</h3>
+        <form className="stacked-form mail-checker-form" onSubmit={sendTest}>
+          <input
+            type="email"
+            placeholder="Destinatario (email)"
+            value={toEmail}
+            onChange={(e) => setToEmail(e.target.value)}
+            required
+          />
+          <button type="submit" disabled={sending || !config?.enabled}>
+            {sending ? "Enviando..." : "Enviar prueba"}
+          </button>
+          {!config?.enabled && !loadingConfig && (
+            <p className="mail-checker-hint">Configura MAILERSEND_API_TOKEN y MAILERSEND_FROM_EMAIL para habilitar el envio.</p>
+          )}
+        </form>
+
+        {sendError && (
+          <div className="mail-checker-result mail-checker-result-error">
+            <strong>Error de red:</strong> {sendError}
+          </div>
+        )}
+
+        {sendResult && (
+          <div className={`mail-checker-result ${sendResult.success ? "mail-checker-result-ok" : "mail-checker-result-error"}`}>
+            <strong>{sendResult.success ? "Enviado correctamente" : "Error al enviar"}</strong>
+            {sendResult.error && (
+              <p className="mail-checker-detail">{sendResult.error}</p>
+            )}
+            {sendResult.request && (
+              <details open={!sendResult.success}>
+                <summary>Detalles de la solicitud</summary>
+                <pre className="mail-checker-pre">{JSON.stringify(sendResult.request, null, 2)}</pre>
+              </details>
+            )}
+            {sendResult.response && (
+              <details open={!sendResult.success}>
+                <summary>Respuesta del servidor</summary>
+                <pre className="mail-checker-pre">{JSON.stringify(sendResult.response, null, 2)}</pre>
+              </details>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
@@ -1782,12 +1922,28 @@ export default function App() {
             </div>
             <details className="user-menu">
               <summary className="user-menu-trigger">
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="user-menu-gear">
+                  <path
+                    d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.34.07-.69.07-1.08s-.03-.73-.07-1.08l2.32-1.81c.21-.16.27-.45.13-.69l-2.2-3.81a.49.49 0 0 0-.61-.22l-2.74 1.1c-.57-.44-1.18-.79-1.86-1.06L14.21 2.1A.49.49 0 0 0 13.72 2h-4.4a.49.49 0 0 0-.48.42L8.5 5.33c-.68.27-1.3.62-1.86 1.06L3.9 5.29a.49.49 0 0 0-.61.22L1.09 9.32a.48.48 0 0 0 .13.69l2.32 1.81C3.5 12.27 3.47 12.62 3.47 13s.03.73.07 1.08l-2.32 1.81a.48.48 0 0 0-.13.69l2.2 3.81c.12.22.39.3.61.22l2.74-1.1c.57.44 1.18.79 1.86 1.06l.34 2.91c.05.24.27.42.52.42h4.4c.25 0 .47-.18.52-.42l.34-2.91c.68-.27 1.3-.62 1.86-1.06l2.74 1.1c.22.08.49 0 .61-.22l2.2-3.81a.48.48 0 0 0-.13-.69z"
+                    fill="currentColor"
+                  />
+                </svg>
                 <span>{currentUser.username}</span>
                 <span className="user-menu-caret" aria-hidden="true">
                   ▾
                 </span>
               </summary>
               <div className="user-menu-popover">
+                <button
+                  type="button"
+                  className="user-menu-item user-menu-item-neutral"
+                  onClick={() => {
+                    switchView("mail");
+                    document.activeElement?.blur();
+                  }}
+                >
+                  Verificar correo
+                </button>
                 <button type="button" className="user-menu-item" onClick={logout}>
                   Cerrar sesion
                 </button>
@@ -1798,7 +1954,7 @@ export default function App() {
       </header>
 
       <main
-        className={`layout ${view === "board" || view === "projects" ? "layout-board" : ""} ${selectedTaskId ? "layout-task-open" : ""}`}
+        className={`layout ${view === "board" || view === "projects" || view === "mail" ? "layout-board" : ""} ${selectedTaskId ? "layout-task-open" : ""}`}
       >
         {selectedTaskId ? (
         <TaskDetail
@@ -1815,6 +1971,8 @@ export default function App() {
           onDeleteChecklistItem={deleteChecklistItem}
           onUpdateDescription={updateTaskDescription}
         />
+        ) : view === "mail" ? (
+          <MailChecker />
         ) : (
           <>
             {view === "list" ? (

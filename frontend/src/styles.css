@@ -325,6 +325,13 @@ textarea {
   color: #6b7280;
 }
 
+.user-menu-gear {
+  width: 1rem;
+  height: 1rem;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
 .user-menu-popover {
   position: absolute;
   top: calc(100% + 0.45rem);
@@ -356,6 +363,10 @@ textarea {
 .user-menu-item:focus-visible {
   outline: none;
   background: rgba(17, 24, 39, 0.08);
+}
+
+.user-menu-item-neutral {
+  color: #374151;
 }
 
 .layout {
@@ -1468,4 +1479,140 @@ textarea {
   .checklist-form button {
     width: 100%;
   }
+}
+
+/* Mail Checker */
+.mail-checker {
+  overflow-y: auto;
+}
+
+.mail-checker-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 1.5rem 1.5rem;
+}
+
+.mail-checker-body h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 0.5rem 0 0;
+}
+
+.mail-checker-config-table {
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  width: 100%;
+  max-width: 560px;
+}
+
+.mail-checker-config-table th,
+.mail-checker-config-table td {
+  padding: 0.4rem 0.75rem 0.4rem 0;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.mail-checker-config-table th {
+  font-weight: 600;
+  color: var(--muted);
+  width: 220px;
+  white-space: nowrap;
+}
+
+.mail-checker-config-table td {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.mail-checker-badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-ok {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.mail-checker-code {
+  font-family: monospace;
+  font-size: 0.8rem;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  color: inherit;
+}
+
+.mail-checker-form {
+  max-width: 400px;
+}
+
+.mail-checker-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+.mail-checker-error {
+  color: #991b1b;
+  font-size: 0.875rem;
+}
+
+.mail-checker-result {
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 680px;
+}
+
+.mail-checker-result-ok {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.mail-checker-result-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.mail-checker-detail {
+  margin: 0;
+  font-weight: normal;
+}
+
+.mail-checker-result details summary {
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+  padding: 0.25rem 0;
+}
+
+.mail-checker-pre {
+  font-family: monospace;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.07);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin: 0.25rem 0 0;
+  overflow-x: auto;
 }

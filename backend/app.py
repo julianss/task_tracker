@@ -618,6 +618,87 @@ def notify_task_change(
         )
 
 
+def try_send_test_email(to_email: str, to_name: str) -> dict:
+    masked_token = (
+        f"{MAILERSEND_API_TOKEN[:8]}...{MAILERSEND_API_TOKEN[-6:]}"
+        if len(MAILERSEND_API_TOKEN) > 18
+        else ("<vacio>" if not MAILERSEND_API_TOKEN else "<corto>")
+    )
+    subject = "[Task Tracker] Correo de prueba"
+    text = "Este es un correo de prueba enviado desde Task Tracker para verificar la configuracion de correo."
+    html = "<p>Este es un correo de prueba enviado desde <strong>Task Tracker</strong> para verificar la configuracion de correo.</p>"
+    recipients = [{"email": to_email, "name": to_name or to_email}]
+    payload = {
+        "from": {"email": MAILERSEND_FROM_EMAIL, "name": MAILERSEND_FROM_NAME},
+        "to": recipients,
+        "subject": subject,
+        "text": text,
+        "html": html,
+    }
+    request_info = {
+        "url": "https://api.mailersend.com/v1/email",
+        "method": "POST",
+        "from_email": MAILERSEND_FROM_EMAIL,
+        "from_name": MAILERSEND_FROM_NAME,
+        "to": recipients,
+        "subject": subject,
+        "authorization": f"Bearer {masked_token}",
+    }
+    if not mailersend_enabled():
+        return {
+            "success": False,
+            "error": "MailerSend no esta configurado (falta token o email de origen)",
+            "request": request_info,
+            "response": None,
+        }
+    http_request = urllib_request.Request(
+        "https://api.mailersend.com/v1/email",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {MAILERSEND_API_TOKEN}",
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            "User-Agent": "task-tracker-mailersend/1.0",
+        },
+        method="POST",
+    )
+    try:
+        with urllib_request.urlopen(http_request, timeout=15) as response:
+            status_code = response.status
+            try:
+                response_body = response.read().decode("utf-8", errors="replace")
+            except Exception:
+                response_body = "<sin cuerpo de respuesta>"
+            return {
+                "success": True,
+                "error": None,
+                "request": request_info,
+                "response": {"status_code": status_code, "body": response_body},
+            }
+    except urllib_error.HTTPError as exc:
+        try:
+            response_body = exc.read().decode("utf-8", errors="replace")
+        except Exception:
+            response_body = "<sin cuerpo de respuesta>"
+        try:
+            response_headers = dict(exc.headers.items())
+        except Exception:
+            response_headers = {}
+        return {
+            "success": False,
+            "error": f"HTTP {exc.code}: {exc.reason}",
+            "request": request_info,
+            "response": {"status_code": exc.code, "headers": response_headers, "body": response_body},
+        }
+    except (urllib_error.URLError, TimeoutError) as exc:
+        return {
+            "success": False,
+            "error": str(exc),
+            "request": request_info,
+            "response": None,
+        }
+
+
 def fetch_attachment_parent_task_id(db: sqlite3.Connection, attachment_id: int) -> tuple[int, str]:
     row = db.execute("SELECT * FROM attachments WHERE id = ?", (attachment_id,)).fetchone()
     if row is None:
@@ -655,6 +736,49 @@ def handle_error(error):
 @app.get("/api/health")
 def healthcheck():
     return jsonify({"ok": True})
+
+
+@app.get("/api/admin/mail-check")
+def mail_check_status():
+    with closing(get_db()) as db:
+        require_current_user(db)
+    return jsonify({
+        "config": {
+            "token_set": bool(MAILERSEND_API_TOKEN),
+            "token_preview": (
+                f"{MAILERSEND_API_TOKEN[:8]}...{MAILERSEND_API_TOKEN[-6:]}"
+                if len(MAILERSEND_API_TOKEN) > 18
+                else ("<vacio>" if not MAILERSEND_API_TOKEN else "<corto>")
+            ),
+            "from_email": MAILERSEND_FROM_EMAIL or None,
+            "from_name": MAILERSEND_FROM_NAME or None,
+            "enabled": mailersend_enabled(),
+        },
+    })
+
+
+@app.post("/api/admin/mail-check")
+def mail_check_send():
+    with closing(get_db()) as db:
+        require_current_user(db)
+    body = request.get_json(silent=True) or {}
+    to_email = (body.get("to_email") or "").strip()
+    to_name = (body.get("to_name") or "").strip()
+    if not to_email:
+        abort(400, description="Se requiere el campo to_email")
+    config = {
+        "token_set": bool(MAILERSEND_API_TOKEN),
+        "token_preview": (
+            f"{MAILERSEND_API_TOKEN[:8]}...{MAILERSEND_API_TOKEN[-6:]}"
+            if len(MAILERSEND_API_TOKEN) > 18
+            else ("<vacio>" if not MAILERSEND_API_TOKEN else "<corto>")
+        ),
+        "from_email": MAILERSEND_FROM_EMAIL or None,
+        "from_name": MAILERSEND_FROM_NAME or None,
+        "enabled": mailersend_enabled(),
+    }
+    send_result = try_send_test_email(to_email, to_name)
+    return jsonify({"config": config, "send_result": send_result})
 
 
 @app.get("/api/auth/me")
