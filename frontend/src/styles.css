@@ -942,6 +942,22 @@ textarea {
   background: linear-gradient(90deg, #dc2626, #ef4444);
 }
 
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+}
+
+.link-button:hover {
+  text-decoration-color: currentColor;
+}
+
 .kanban-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

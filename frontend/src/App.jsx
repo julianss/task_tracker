@@ -335,7 +335,7 @@ function ProjectModal({
   );
 }
 
-function TaskTable({ tasks, onOpenTask }) {
+function TaskTable({ tasks, onOpenTask, initialFilters }) {
   const [columnFilters, setColumnFilters] = useState({
     id: "",
     project_name: "",
@@ -344,6 +344,8 @@ function TaskTable({ tasks, onOpenTask }) {
     created_at: "",
     updated_at: "",
     last_updated_by: "",
+    pending_only: false,
+    ...initialFilters,
   });
   const [sortConfig, setSortConfig] = useState({ key: "updated_at", direction: "desc" });
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZES[0]);
@@ -363,6 +365,7 @@ function TaskTable({ tasks, onOpenTask }) {
         return false;
       }
       if (normalizedFilters.status && task.status !== normalizedFilters.status) return false;
+      if (columnFilters.pending_only && task.status === "done") return false;
       if (normalizedFilters.created_at && !String(task.created_at ?? "").toLowerCase().includes(normalizedFilters.created_at)) {
         return false;
       }
@@ -649,7 +652,7 @@ function TaskTable({ tasks, onOpenTask }) {
   );
 }
 
-function ProjectTable({ projects, onOpenProject }) {
+function ProjectTable({ projects, onOpenProject, onNavigateToTasks }) {
   return (
     <div className="data-table-shell">
       <div className="data-table-toolbar">
@@ -707,8 +710,22 @@ function ProjectTable({ projects, onOpenProject }) {
                         ) : null}
                       </div>
                     </td>
-                    <td>{project.task_count ?? 0}</td>
-                    <td>{project.pending_count ?? 0}</td>
+                    <td>
+                      <button
+                        className="link-button"
+                        onClick={(e) => { e.stopPropagation(); onNavigateToTasks({ project_name: project.name }); }}
+                      >
+                        {project.task_count ?? 0}
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        className="link-button"
+                        onClick={(e) => { e.stopPropagation(); onNavigateToTasks({ project_name: project.name, pending_only: true }); }}
+                      >
+                        {project.pending_count ?? 0}
+                      </button>
+                    </td>
                     <td>{members.length}</td>
                     <td>{membersWithEmail.length}</td>
                     <td title={project.last_task_update ? `Último cambio: ${formatTableDate(project.last_task_update)}` : "Sin tareas"}>
@@ -1128,6 +1145,7 @@ export default function App() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [selectedTaskLoading, setSelectedTaskLoading] = useState(false);
   const [view, setView] = useState("list");
+  const [taskListInitialFilters, setTaskListInitialFilters] = useState(null);
   const [filters, setFilters] = useState({ q: "" });
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [taskForm, setTaskForm] = useState(emptyTaskForm);
@@ -1602,9 +1620,16 @@ export default function App() {
 
   const switchView = (nextView) => {
     setView(nextView);
+    setTaskListInitialFilters(null);
     if (selectedTaskId) {
       closeTask();
     }
+  };
+
+  const navigateToTasks = (initialFilters) => {
+    setTaskListInitialFilters(initialFilters);
+    setView("list");
+    if (selectedTaskId) closeTask();
   };
 
   const onBoardDrop = async (event, status) => {
@@ -1838,9 +1863,9 @@ export default function App() {
               {loading ? (
                 <p className="empty-state">Cargando...</p>
               ) : view === "list" ? (
-                <TaskTable tasks={tasks} onOpenTask={openTask} />
+                <TaskTable tasks={tasks} onOpenTask={openTask} initialFilters={taskListInitialFilters} />
               ) : view === "projects" ? (
-                <ProjectTable projects={projects} onOpenProject={openEditProjectModal} />
+                <ProjectTable projects={projects} onOpenProject={openEditProjectModal} onNavigateToTasks={navigateToTasks} />
               ) : (
                 <>
                   <div className="panel-header">
