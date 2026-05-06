@@ -1383,12 +1383,18 @@ export default function App() {
     setError("");
     try {
       const [loadedProjects] = await Promise.all([loadProjects(), loadUsers()]);
-      const effectiveProjectId = nextProjectId || loadedProjects[0]?.id || "";
-      setSelectedProjectId((current) => current || String(effectiveProjectId || ""));
+      const requestedProjectId = String(nextProjectId || "");
+      const hasRequestedProject = loadedProjects.some((project) => String(project.id) === requestedProjectId);
+      const effectiveProjectId = hasRequestedProject ? requestedProjectId : String(loadedProjects[0]?.id || "");
+      setSelectedProjectId(effectiveProjectId);
       await Promise.all([loadTasks(nextFilters), loadBoard(effectiveProjectId)]);
-      if (!taskForm.project_id && loadedProjects[0]?.id) {
-        setTaskForm((current) => ({ ...current, project_id: String(loadedProjects[0].id) }));
-      }
+      setTaskForm((current) => {
+        const hasCurrentProject = loadedProjects.some((project) => String(project.id) === String(current.project_id));
+        return {
+          ...current,
+          project_id: hasCurrentProject ? current.project_id : effectiveProjectId,
+        };
+      });
     } catch (nextError) {
       setError(nextError.message);
     } finally {
@@ -1432,7 +1438,14 @@ export default function App() {
   }, [selectedProjectId]);
 
   useEffect(() => {
-    if (!selectedProjectId && projects[0]?.id) {
+    if (!projects.length) {
+      if (selectedProjectId) {
+        setSelectedProjectId("");
+      }
+      return;
+    }
+    const hasSelectedProject = projects.some((project) => String(project.id) === String(selectedProjectId));
+    if (!hasSelectedProject) {
       setSelectedProjectId(String(projects[0].id));
     }
   }, [projects, selectedProjectId]);
@@ -1519,15 +1532,9 @@ export default function App() {
           body: buildProjectPayload(),
         }),
       );
-      const nextProjects = isEditing
-        ? projects.map((item) => (item.id === project.id ? project : item)).sort((a, b) => a.name.localeCompare(b.name))
-        : [...projects, project].sort((a, b) => a.name.localeCompare(b.name));
-      setProjects(nextProjects);
-      setSelectedProjectId(String(project.id));
-      setTaskForm((current) => ({ ...current, project_id: String(project.id) }));
       setProjectForm(emptyProjectForm);
       setIsProjectModalOpen(false);
-      await Promise.all([loadTasks(filters), loadBoard(selectedProjectId || project.id)]);
+      await refreshAll(filters, project.id);
       if (selectedTaskId) {
         await loadSelectedTask(selectedTaskId);
       }
@@ -1763,6 +1770,9 @@ export default function App() {
     setTaskListInitialFilters(null);
     if (selectedTaskId) {
       closeTask();
+    }
+    if (nextView === "projects") {
+      loadProjects().catch((nextError) => setError(nextError.message));
     }
   };
 

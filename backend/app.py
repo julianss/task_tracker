@@ -272,6 +272,19 @@ def fetch_project(db: sqlite3.Connection, project_id: int) -> dict:
     return hydrate_project(db, row_to_dict(row))
 
 
+def user_has_project_access(db: sqlite3.Connection, user_id: int, project_id: int) -> bool:
+    row = db.execute(
+        "SELECT 1 FROM project_users WHERE project_id = ? AND user_id = ?",
+        (project_id, user_id),
+    ).fetchone()
+    return row is not None
+
+
+def require_project_access(db: sqlite3.Connection, user_id: int, project_id: int) -> None:
+    if not user_has_project_access(db, user_id, project_id):
+        abort(404, description="No se encontro el proyecto")
+
+
 def store_uploaded_file(file_storage) -> dict | None:
     if not file_storage or not file_storage.filename:
         return None
@@ -369,6 +382,12 @@ def fetch_task(db: sqlite3.Connection, task_id: int) -> dict:
     if row is None:
         abort(404, description="No se encontro la tarea")
     return hydrate_task(db, row_to_dict(row))
+
+
+def fetch_task_for_user(db: sqlite3.Connection, task_id: int, user_id: int) -> dict:
+    task = fetch_task(db, task_id)
+    require_project_access(db, user_id, int(task["project_id"]))
+    return task
 
 
 def fetch_audit_logs(db: sqlite3.Connection, task_id: int) -> list[dict]:
@@ -820,6 +839,7 @@ def logout():
 @app.get("/api/projects")
 def list_projects():
     with closing(get_db()) as db:
+        user = require_current_user(db)
         rows = db.execute(
             """
             SELECT
@@ -828,10 +848,13 @@ def list_projects():
                 SUM(CASE WHEN tasks.status IS NOT NULL AND tasks.status != 'done' THEN 1 ELSE 0 END) AS pending_count,
                 MAX(tasks.updated_at) AS last_task_update
             FROM projects
+            JOIN project_users ON project_users.project_id = projects.id
             LEFT JOIN tasks ON tasks.project_id = projects.id
+            WHERE project_users.user_id = ?
             GROUP BY projects.id
             ORDER BY LOWER(projects.name) ASC
-            """
+            """,
+            (user["id"],),
         ).fetchall()
         return jsonify([hydrate_project(db, row_to_dict(row)) for row in rows])
 
@@ -872,7 +895,8 @@ def update_project(project_id: int):
         abort(400, description="El nombre del proyecto es obligatorio")
     old_logo_stored_name = None
     with closing(get_db()) as db:
-        require_current_user(db)
+        user = require_current_user(db)
+        require_project_access(db, user["id"], project_id)
         current = fetch_project(db, project_id)
         stored_logo = store_uploaded_file(logo_file)
         next_logo_original_name = current.get("logo_original_name")
@@ -903,35 +927,35 @@ def list_tasks():
     status = request.args.get("status", type=str)
     query = (request.args.get("q", type=str) or "").strip().lower()
 
-    clauses = []
-    params: list[object] = []
-
-    if project_id:
-        clauses.append("tasks.project_id = ?")
-        params.append(project_id)
-    if status:
-        normalize_status(status)
-        clauses.append("tasks.status = ?")
-        params.append(status)
-    if query:
-        like_query = f"%{query}%"
-        clauses.append(
-            """
-            (
-                LOWER(tasks.description) LIKE ?
-                OR LOWER(projects.name) LIKE ?
-                OR EXISTS (
-                    SELECT 1 FROM comments
-                    WHERE comments.task_id = tasks.id
-                    AND LOWER(comments.body) LIKE ?
-                )
-            )
-            """
-        )
-        params.extend([like_query, like_query, like_query])
-
-    where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     with closing(get_db()) as db:
+        user = require_current_user(db)
+        clauses = ["EXISTS (SELECT 1 FROM project_users WHERE project_users.project_id = tasks.project_id AND project_users.user_id = ?)"]
+        params: list[object] = [user["id"]]
+        if project_id:
+            require_project_access(db, user["id"], project_id)
+            clauses.append("tasks.project_id = ?")
+            params.append(project_id)
+        if status:
+            normalize_status(status)
+            clauses.append("tasks.status = ?")
+            params.append(status)
+        if query:
+            like_query = f"%{query}%"
+            clauses.append(
+                """
+                (
+                    LOWER(tasks.description) LIKE ?
+                    OR LOWER(projects.name) LIKE ?
+                    OR EXISTS (
+                        SELECT 1 FROM comments
+                        WHERE comments.task_id = tasks.id
+                        AND LOWER(comments.body) LIKE ?
+                    )
+                )
+                """
+            )
+            params.extend([like_query, like_query, like_query])
+        where_clause = f"WHERE {' AND '.join(clauses)}"
         rows = db.execute(
             f"""
             SELECT
@@ -952,7 +976,8 @@ def list_tasks():
 @app.get("/api/tasks/<int:task_id>")
 def get_task(task_id: int):
     with closing(get_db()) as db:
-        return jsonify(fetch_task(db, task_id))
+        user = require_current_user(db)
+        return jsonify(fetch_task_for_user(db, task_id, user["id"]))
 
 
 @app.post("/api/tasks")
@@ -967,6 +992,7 @@ def create_task():
         abort(400, description="El proyecto es obligatorio")
     with closing(get_db()) as db:
         user = require_current_user(db)
+        require_project_access(db, user["id"], int(project_id))
         now = utc_now()
         cursor = db.execute(
             """
@@ -993,11 +1019,12 @@ def update_task(task_id: int):
     payload = request.get_json(force=True)
     with closing(get_db()) as db:
         user = require_current_user(db)
-        current = fetch_task(db, task_id)
+        current = fetch_task_for_user(db, task_id, user["id"])
         previous_project_id = int(current["project_id"])
         description = (payload.get("description") or current["description"]).strip()
         status = normalize_status(payload.get("status") or current["status"])
         project_id = payload.get("project_id") or current["project_id"]
+        require_project_access(db, user["id"], int(project_id))
         db.execute(
             """
             UPDATE tasks
@@ -1045,7 +1072,7 @@ def update_task(task_id: int):
 def upload_task_attachments(task_id: int):
     with closing(get_db()) as db:
         user = require_current_user(db)
-        fetch_task(db, task_id)
+        fetch_task_for_user(db, task_id, user["id"])
         files = request.files.getlist("attachments")
         save_uploaded_files(db, files, task_id=task_id)
         db.execute("UPDATE tasks SET updated_at = ? WHERE id = ?", (utc_now(), task_id))
@@ -1067,6 +1094,7 @@ def delete_attachment(attachment_id: int):
     with closing(get_db()) as db:
         user = require_current_user(db)
         task_id, stored_name = fetch_attachment_parent_task_id(db, attachment_id)
+        fetch_task_for_user(db, task_id, user["id"])
         attachment = db.execute("SELECT original_name FROM attachments WHERE id = ?", (attachment_id,)).fetchone()
         db.execute("DELETE FROM attachments WHERE id = ?", (attachment_id,))
         db.execute("UPDATE tasks SET updated_at = ? WHERE id = ?", (utc_now(), task_id))
@@ -1092,7 +1120,7 @@ def create_checklist_item(task_id: int):
         abort(400, description="El texto del elemento de la lista es obligatorio")
     with closing(get_db()) as db:
         user = require_current_user(db)
-        fetch_task(db, task_id)
+        fetch_task_for_user(db, task_id, user["id"])
         db.execute(
             "INSERT INTO checklist_items (task_id, body, is_done, created_at) VALUES (?, ?, ?, ?)",
             (task_id, body, 0, utc_now()),
@@ -1119,6 +1147,7 @@ def update_checklist_item(item_id: int):
         if row is None:
             abort(404, description="No se encontro el elemento de la lista")
         current = row_to_dict(row)
+        fetch_task_for_user(db, int(current["task_id"]), user["id"])
         body = (payload.get("body") or current["body"]).strip()
         if not body:
             abort(400, description="El texto del elemento de la lista es obligatorio")
@@ -1164,6 +1193,7 @@ def delete_checklist_item(item_id: int):
         if row is None:
             abort(404, description="No se encontro el elemento de la lista")
         current = row_to_dict(row)
+        fetch_task_for_user(db, int(current["task_id"]), user["id"])
         db.execute("DELETE FROM checklist_items WHERE id = ?", (item_id,))
         db.execute("UPDATE tasks SET updated_at = ? WHERE id = ?", (utc_now(), current["task_id"]))
         write_task_audit_log(
@@ -1190,7 +1220,7 @@ def create_comment(task_id: int):
         abort(400, description="El texto del comentario es obligatorio")
     with closing(get_db()) as db:
         user = require_current_user(db)
-        fetch_task(db, task_id)
+        fetch_task_for_user(db, task_id, user["id"])
         now = utc_now()
         cursor = db.execute(
             "INSERT INTO comments (task_id, body, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
@@ -1224,6 +1254,8 @@ def create_comment(task_id: int):
 @app.get("/api/projects/<int:project_id>/board")
 def project_board(project_id: int):
     with closing(get_db()) as db:
+        user = require_current_user(db)
+        require_project_access(db, user["id"], project_id)
         project = fetch_project(db, project_id)
         rows = db.execute(
             """
