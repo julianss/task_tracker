@@ -516,32 +516,14 @@ def log_startup_configuration() -> None:
     )
 
 
-def send_mailersend_email(*, recipients: list[dict], subject: str, text: str, html: str) -> None:
+def send_mailersend_email(*, recipients: list[dict], subject: str, text: str, html: str) -> dict[str, list]:
     if not recipients or not mailersend_enabled():
-        return
+        return {"sent": [], "failed": []}
     recipient_emails = [recipient.get("email", "") for recipient in recipients]
     masked_token = (
         f"{MAILERSEND_API_TOKEN[:8]}...{MAILERSEND_API_TOKEN[-6:]}"
         if len(MAILERSEND_API_TOKEN) > 18
         else "<masked>"
-    )
-    payload = {
-        "from": {"email": MAILERSEND_FROM_EMAIL, "name": MAILERSEND_FROM_NAME},
-        "to": recipients,
-        "subject": subject,
-        "text": text,
-        "html": html,
-    }
-    request_data = urllib_request.Request(
-        "https://api.mailersend.com/v1/email",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {MAILERSEND_API_TOKEN}",
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-            "User-Agent": "task-tracker-mailersend/1.0",
-        },
-        method="POST",
     )
     logger.info(
         "MailerSend notification request prepared; "
@@ -550,12 +532,57 @@ def send_mailersend_email(*, recipients: list[dict], subject: str, text: str, ht
         "user_agent='task-tracker-mailersend/1.0'; "
         f"from={MAILERSEND_FROM_EMAIL!r}; recipients={recipient_emails!r}; subject={subject!r}"
     )
-    with urllib_request.urlopen(request_data, timeout=15):
-        logger.info(
-            f"MailerSend notification sent successfully; from={MAILERSEND_FROM_EMAIL!r}; "
-            f"recipients={recipient_emails!r}; subject={subject!r}"
+    sent_recipients: list[str] = []
+    failed_recipients: list[dict] = []
+    for recipient in recipients:
+        recipient_email = recipient.get("email", "")
+        payload = {
+            "from": {"email": MAILERSEND_FROM_EMAIL, "name": MAILERSEND_FROM_NAME},
+            "to": [recipient],
+            "subject": subject,
+            "text": text,
+            "html": html,
+        }
+        request_data = urllib_request.Request(
+            "https://api.mailersend.com/v1/email",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {MAILERSEND_API_TOKEN}",
+                "Content-Type": "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+                "User-Agent": "task-tracker-mailersend/1.0",
+            },
+            method="POST",
         )
-        return
+        try:
+            with urllib_request.urlopen(request_data, timeout=15):
+                sent_recipients.append(recipient_email)
+                logger.info(
+                    f"MailerSend notification sent successfully; from={MAILERSEND_FROM_EMAIL!r}; "
+                    f"recipient={recipient_email!r}; subject={subject!r}"
+                )
+        except urllib_error.HTTPError as exc:
+            response_body = ""
+            response_headers = {}
+            try:
+                response_body = exc.read().decode("utf-8", errors="replace")
+            except Exception:
+                response_body = "<no response body>"
+            try:
+                response_headers = dict(exc.headers.items())
+            except Exception:
+                response_headers = {"error": "<unable to read response headers>"}
+            failed_recipients.append(
+                {
+                    "email": recipient_email,
+                    "error": str(exc),
+                    "headers": response_headers,
+                    "response": response_body,
+                }
+            )
+        except (urllib_error.URLError, TimeoutError) as exc:
+            failed_recipients.append({"email": recipient_email, "error": str(exc)})
+    return {"sent": sent_recipients, "failed": failed_recipients}
 
 
 def notify_task_change(
@@ -620,28 +647,14 @@ def notify_task_change(
     )
     if extra_html:
         html += extra_html
-    try:
-        send_mailersend_email(recipients=recipients, subject=subject, text=text, html=html)
-    except urllib_error.HTTPError as exc:
-        response_body = ""
-        response_headers = {}
-        try:
-            response_body = exc.read().decode("utf-8", errors="replace")
-        except Exception:
-            response_body = "<no response body>"
-        try:
-            response_headers = dict(exc.headers.items())
-        except Exception:
-            response_headers = {"error": "<unable to read response headers>"}
+    delivery_result = send_mailersend_email(
+        recipients=recipients, subject=subject, text=text, html=html
+    )
+    if delivery_result["failed"]:
         logger.error(
-            f"MailerSend notification failed for task {task_id}: {exc}; "
+            f"MailerSend notification failed for task {task_id}: "
             f"from={MAILERSEND_FROM_EMAIL!r}; recipients={recipient_emails!r}; "
-            f"headers={response_headers!r}; response={response_body}"
-        )
-    except (urllib_error.URLError, TimeoutError) as exc:
-        logger.error(
-            f"MailerSend notification failed for task {task_id}: {exc}; "
-            f"from={MAILERSEND_FROM_EMAIL!r}; recipients={recipient_emails!r}"
+            f"failed={delivery_result['failed']!r}"
         )
 
 
