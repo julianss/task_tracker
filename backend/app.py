@@ -15,7 +15,7 @@ from pathlib import Path
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
-from flask import Flask, abort, jsonify, request, send_file, send_from_directory, session
+from flask import Flask, abort, jsonify, has_request_context, request, send_file, send_from_directory, session
 from werkzeug.security import check_password_hash
 from werkzeug.utils import secure_filename
 
@@ -25,6 +25,7 @@ DB_PATH = BASE_DIR / "data" / "task_tracker.sqlite3"
 UPLOAD_DIR = BASE_DIR / "data" / "uploads"
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 APP_BASE_PATH = os.environ.get("APP_BASE_PATH", "/").strip() or "/"
+APP_PUBLIC_URL = os.environ.get("APP_PUBLIC_URL", "").strip()
 MAILERSEND_API_TOKEN = os.environ.get("MAILERSEND_API_TOKEN", "").strip()
 MAILERSEND_FROM_EMAIL = os.environ.get("MAILERSEND_FROM_EMAIL", "").strip()
 MAILERSEND_FROM_NAME = os.environ.get("MAILERSEND_FROM_NAME", "Task Tracker").strip() or "Task Tracker"
@@ -67,6 +68,13 @@ def normalize_base_path(value: str) -> str:
 
 
 APP_BASE_PATH = normalize_base_path(APP_BASE_PATH)
+
+
+def normalize_public_url(value: str) -> str:
+    return value.rstrip("/")
+
+
+APP_PUBLIC_URL = normalize_public_url(APP_PUBLIC_URL)
 
 
 def utc_now() -> str:
@@ -217,6 +225,19 @@ def build_upload_url(stored_name: str | None) -> str | None:
         return None
     prefix = "" if APP_BASE_PATH == "/" else APP_BASE_PATH
     return f"{prefix}/uploads/{stored_name}"
+
+
+def build_task_url(task_id: int) -> str | None:
+    if APP_PUBLIC_URL:
+        return f"{APP_PUBLIC_URL}{APP_BASE_PATH if APP_BASE_PATH != '/' else ''}/?task={task_id}"
+    if not has_request_context():
+        return None
+    scheme = (request.headers.get("X-Forwarded-Proto") or request.scheme or "http").split(",")[0].strip()
+    host = (request.headers.get("X-Forwarded-Host") or request.host or "").split(",")[0].strip()
+    if not host:
+        return None
+    prefix = APP_BASE_PATH if APP_BASE_PATH != "/" else ""
+    return f"{scheme}://{host}{prefix}/?task={task_id}"
 
 
 def project_logo_payload(project: dict) -> dict:
@@ -510,6 +531,7 @@ def log_startup_configuration() -> None:
     logger.info(
         "Startup configuration: "
         f"APP_BASE_PATH={APP_BASE_PATH!r}; "
+        f"APP_PUBLIC_URL={APP_PUBLIC_URL!r}; "
         f"MAILERSEND_API_TOKEN={'set' if bool(MAILERSEND_API_TOKEN) else 'missing'}; "
         f"MAILERSEND_FROM_EMAIL={'set' if bool(MAILERSEND_FROM_EMAIL) else 'missing'}; "
         f"MAILERSEND_FROM_NAME={'set' if bool(MAILERSEND_FROM_NAME) else 'missing'}"
@@ -620,6 +642,7 @@ def notify_task_change(
         )
         return
     recipient_emails = [recipient.get("email", "") for recipient in recipients]
+    task_url = build_task_url(int(task["id"]))
 
     subject = f"[Task Tracker] Tarea #{task['id']} actualizada en {task['project_name']}"
     summary = task["audit_logs"][0]["details"] if task.get("audit_logs") else action_label
@@ -633,6 +656,8 @@ def notify_task_change(
         f"Actualizada: {task['updated_at']}\n\n"
         f"Descripcion:\n{task['description']}\n"
     )
+    if task_url:
+        text += f"\nAbrir tarea: {task_url}\n"
     if extra_text:
         text += f"\n{extra_text}\n"
     html = (
@@ -645,6 +670,8 @@ def notify_task_change(
         f"<p><strong>Actualizada:</strong> {escape(task['updated_at'])}</p>"
         f"<p><strong>Descripcion:</strong><br>{escape(task['description']).replace(chr(10), '<br>')}</p>"
     )
+    if task_url:
+        html += f'<p><a href="{escape(task_url, quote=True)}">Abrir tarea</a></p>'
     if extra_html:
         html += extra_html
     delivery_result = send_mailersend_email(

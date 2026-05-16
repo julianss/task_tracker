@@ -33,6 +33,7 @@ After pulling new changes on the VPS, rebuild the frontend with:
 Important environment variables:
 
 - `APP_BASE_PATH`: public base path for the app, default `/tasks`
+- `APP_PUBLIC_URL`: optional absolute public origin for links in emails, for example `https://tracker.example.com`
 - `APP_PORT`: localhost port bound by gunicorn, default `18000`
 - `APP_NAME`: used for the service and Apache snippet names
 - `SECRET_KEY`: written into `/etc/<app-name>.env` on first deploy if provided
@@ -40,7 +41,7 @@ Important environment variables:
 - `MAILERSEND_FROM_EMAIL`: sender address used for MailerSend notifications, must belong to a verified MailerSend domain
 - `MAILERSEND_FROM_NAME`: optional sender name, defaults to `Task Tracker`
 
-The frontend build also uses `APP_BASE_PATH`, so static assets and API requests resolve correctly when the app is served from `/tasks`.
+The frontend build also uses `APP_BASE_PATH`, so static assets and API requests resolve correctly when the app is served from `/tasks`. If `APP_PUBLIC_URL` is set, notification emails use it to generate clickable task links.
 
 ## Add Users
 
