@@ -62,10 +62,28 @@ function formatChecklistSummary(task) {
 function getProjectProgress(project) {
   const total = Number(project?.task_count) || 0;
   const pending = Number(project?.pending_count) || 0;
-  const done = Math.max(0, total - pending);
+  const statusCounts = {
+    todo: Number(project?.todo_count) || 0,
+    in_progress: Number(project?.in_progress_count) || 0,
+    testing: Number(project?.testing_count) || 0,
+    done: Number(project?.done_count) || 0,
+  };
+  const countedTotal = Object.values(statusCounts).reduce((sum, count) => sum + count, 0);
+  const unknown = Math.max(0, total - countedTotal);
+  const done = statusCounts.done;
   const donePercent = total > 0 ? Math.round((done / total) * 100) : 0;
   const tone = total === 0 ? "neutral" : donePercent > 50 ? "good" : donePercent >= 30 ? "warn" : "bad";
-  return { total, pending, done, donePercent, tone, hasTasks: total > 0 };
+  const segments = [
+    { key: "todo", count: statusCounts.todo, label: statusLabel("todo") },
+    { key: "in_progress", count: statusCounts.in_progress, label: statusLabel("in_progress") },
+    { key: "testing", count: statusCounts.testing, label: statusLabel("testing") },
+    { key: "done", count: statusCounts.done, label: statusLabel("done") },
+  ].filter((segment) => segment.count > 0);
+  if (unknown > 0) {
+    segments.push({ key: "unknown", count: unknown, label: "Sin estado" });
+  }
+  const summary = segments.map((segment) => `${segment.label}: ${segment.count}`).join(" · ");
+  return { total, pending, done, donePercent, tone, hasTasks: total > 0, segments, summary };
 }
 
 function formatTableDate(value) {
@@ -701,11 +719,18 @@ function ProjectTable({ projects, onOpenProject, onNavigateToTasks }) {
                           <small>{progress.hasTasks ? `${progress.pending}/${progress.total} pendientes` : ""}</small>
                         </div>
                         {progress.hasTasks ? (
-                          <div className="project-progress-track" aria-hidden="true">
-                            <span
-                              className={`project-progress-fill project-progress-${progress.tone}`}
-                              style={{ width: `${progress.donePercent}%` }}
-                            />
+                          <div
+                            className="project-progress-track"
+                            aria-label={`Distribucion de tareas. ${progress.summary}`}
+                            title={progress.summary}
+                          >
+                            {progress.segments.map((segment) => (
+                              <span
+                                key={segment.key}
+                                className={`project-progress-segment project-progress-segment-${segment.key}`}
+                                style={{ flexGrow: segment.count }}
+                              />
+                            ))}
                           </div>
                         ) : null}
                       </div>

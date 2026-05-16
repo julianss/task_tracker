@@ -280,7 +280,11 @@ def fetch_project(db: sqlite3.Connection, project_id: int) -> dict:
         SELECT
             projects.*,
             COUNT(tasks.id) AS task_count,
-            SUM(CASE WHEN tasks.status IS NOT NULL AND tasks.status != 'done' THEN 1 ELSE 0 END) AS pending_count
+            SUM(CASE WHEN tasks.status IS NOT NULL AND tasks.status != 'done' THEN 1 ELSE 0 END) AS pending_count,
+            SUM(CASE WHEN tasks.status = 'todo' THEN 1 ELSE 0 END) AS todo_count,
+            SUM(CASE WHEN tasks.status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress_count,
+            SUM(CASE WHEN tasks.status = 'testing' THEN 1 ELSE 0 END) AS testing_count,
+            SUM(CASE WHEN tasks.status = 'done' THEN 1 ELSE 0 END) AS done_count
         FROM projects
         LEFT JOIN tasks ON tasks.project_id = projects.id
         WHERE projects.id = ?
@@ -886,6 +890,10 @@ def list_projects():
                 projects.*,
                 COUNT(tasks.id) AS task_count,
                 SUM(CASE WHEN tasks.status IS NOT NULL AND tasks.status != 'done' THEN 1 ELSE 0 END) AS pending_count,
+                SUM(CASE WHEN tasks.status = 'todo' THEN 1 ELSE 0 END) AS todo_count,
+                SUM(CASE WHEN tasks.status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress_count,
+                SUM(CASE WHEN tasks.status = 'testing' THEN 1 ELSE 0 END) AS testing_count,
+                SUM(CASE WHEN tasks.status = 'done' THEN 1 ELSE 0 END) AS done_count,
                 MAX(tasks.updated_at) AS last_task_update
             FROM projects
             JOIN project_users ON project_users.project_id = projects.id
