@@ -57,6 +57,27 @@ Set or update the email address for an existing user with:
 
 Project notifications are sent to users linked to the project who have an email address configured.
 
+## Read-Only API Tokens
+
+Create a read-only API token for an existing user with:
+
+`.venv/bin/python scripts/manage_read_tokens.py create <username> <token-name>`
+
+The token is shown once and only its hash is stored. A token can read tasks visible to that user, including comments, attachments, checklist items, and audit logs:
+
+`curl -H "Authorization: Bearer <token>" "https://tracker.example.com/tasks/api/tasks?status=todo"`
+
+Read-only tokens are accepted only by task read endpoints:
+
+- `GET /api/tasks`
+- `GET /api/tasks/<task_id>`
+
+List or revoke tokens with:
+
+`.venv/bin/python scripts/manage_read_tokens.py list`
+
+`.venv/bin/python scripts/manage_read_tokens.py revoke <token-id>`
+
 ## Features
 
 - Projects for classifying tasks

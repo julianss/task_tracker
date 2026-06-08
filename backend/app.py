@@ -176,6 +176,20 @@ def init_db() -> None:
                 FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
             );
+
+            CREATE TABLE IF NOT EXISTS read_api_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                token_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                last_used_at TEXT,
+                revoked_at TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_read_api_tokens_user_id
+                ON read_api_tokens(user_id);
             """
         )
         project_columns = {row["name"] for row in db.execute("PRAGMA table_info(projects)").fetchall()}
@@ -434,6 +448,50 @@ def get_current_user(db: sqlite3.Connection) -> sqlite3.Row | None:
     if not user_id:
         return None
     return db.execute("SELECT id, username, email, created_at FROM users WHERE id = ?", (user_id,)).fetchone()
+
+
+def get_bearer_token() -> str | None:
+    authorization = request.headers.get("Authorization", "").strip()
+    if not authorization:
+        return None
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return None
+    return token.strip()
+
+
+def get_read_api_token_user(db: sqlite3.Connection) -> sqlite3.Row | None:
+    token = get_bearer_token()
+    if token is None:
+        return None
+    rows = db.execute(
+        """
+        SELECT
+            read_api_tokens.id AS token_id,
+            read_api_tokens.token_hash,
+            users.id,
+            users.username,
+            users.email,
+            users.created_at
+        FROM read_api_tokens
+        JOIN users ON users.id = read_api_tokens.user_id
+        WHERE read_api_tokens.revoked_at IS NULL
+        ORDER BY read_api_tokens.id ASC
+        """
+    ).fetchall()
+    for row in rows:
+        if check_password_hash(row["token_hash"], token):
+            db.execute("UPDATE read_api_tokens SET last_used_at = ? WHERE id = ?", (utc_now(), row["token_id"]))
+            db.commit()
+            return row
+    return None
+
+
+def require_task_reader(db: sqlite3.Connection) -> sqlite3.Row:
+    user = get_current_user(db) or get_read_api_token_user(db)
+    if user is None:
+        abort(401, description="Debes iniciar sesion o usar un token API valido")
+    return user
 
 
 def require_current_user(db: sqlite3.Connection) -> sqlite3.Row:
@@ -976,7 +1034,7 @@ def list_tasks():
     query = (request.args.get("q", type=str) or "").strip().lower()
 
     with closing(get_db()) as db:
-        user = require_current_user(db)
+        user = require_task_reader(db)
         clauses = ["EXISTS (SELECT 1 FROM project_users WHERE project_users.project_id = tasks.project_id AND project_users.user_id = ?)"]
         params: list[object] = [user["id"]]
         if project_id:
@@ -1024,7 +1082,7 @@ def list_tasks():
 @app.get("/api/tasks/<int:task_id>")
 def get_task(task_id: int):
     with closing(get_db()) as db:
-        user = require_current_user(db)
+        user = require_task_reader(db)
         return jsonify(fetch_task_for_user(db, task_id, user["id"]))
 
 
