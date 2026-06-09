@@ -182,6 +182,7 @@ def init_db() -> None:
                 user_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
                 token_hash TEXT NOT NULL,
+                can_update_testing INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
                 last_used_at TEXT,
                 revoked_at TEXT,
@@ -207,6 +208,9 @@ def init_db() -> None:
         user_columns = {row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()}
         if "email" not in user_columns:
             db.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        token_columns = {row["name"] for row in db.execute("PRAGMA table_info(read_api_tokens)").fetchall()}
+        if "can_update_testing" not in token_columns:
+            db.execute("ALTER TABLE read_api_tokens ADD COLUMN can_update_testing INTEGER NOT NULL DEFAULT 0")
         db.execute("UPDATE tasks SET status = 'testing' WHERE status = 'blocked'")
         count = db.execute("SELECT COUNT(*) AS count FROM projects").fetchone()["count"]
         if count == 0:
@@ -469,6 +473,7 @@ def get_read_api_token_user(db: sqlite3.Connection) -> sqlite3.Row | None:
         SELECT
             read_api_tokens.id AS token_id,
             read_api_tokens.token_hash,
+            read_api_tokens.can_update_testing,
             users.id,
             users.username,
             users.email,
@@ -491,6 +496,15 @@ def require_task_reader(db: sqlite3.Connection) -> sqlite3.Row:
     user = get_current_user(db) or get_read_api_token_user(db)
     if user is None:
         abort(401, description="Debes iniciar sesion o usar un token API valido")
+    return user
+
+
+def require_testing_task_agent(db: sqlite3.Connection) -> sqlite3.Row:
+    user = get_read_api_token_user(db)
+    if user is None:
+        abort(401, description="Se requiere un token API valido")
+    if not bool(user["can_update_testing"]):
+        abort(403, description="El token API no puede actualizar tareas a testing")
     return user
 
 
@@ -1171,6 +1185,57 @@ def update_task(task_id: int):
             actor_name=user["username"],
             include_project_ids=[previous_project_id, int(project_id)],
         )
+        return jsonify(fetch_task(db, task_id))
+
+
+@app.post("/api/tasks/<int:task_id>/agent/testing")
+def agent_mark_task_testing(task_id: int):
+    payload = request.get_json(silent=True) or {}
+    comment_body = (payload.get("comment") or payload.get("body") or "").strip()
+    with closing(get_db()) as db:
+        user = require_testing_task_agent(db)
+        current = fetch_task_for_user(db, task_id, user["id"])
+        now = utc_now()
+        status_changed = current["status"] != "testing"
+        if status_changed:
+            db.execute(
+                "UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?",
+                ("testing", now, task_id),
+            )
+            write_task_audit_log(
+                db,
+                task_id=task_id,
+                user_id=user["id"],
+                action="status_updated",
+                details=f"Cambio el estado de '{current['status']}' a 'testing'.",
+            )
+        if comment_body:
+            db.execute(
+                "INSERT INTO comments (task_id, body, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                (task_id, comment_body, user["id"], now, now),
+            )
+            db.execute("UPDATE tasks SET updated_at = ? WHERE id = ?", (now, task_id))
+            write_task_audit_log(
+                db,
+                task_id=task_id,
+                user_id=user["id"],
+                action="comment_added",
+                details="Agrego un comentario.",
+            )
+        db.commit()
+        if status_changed or comment_body:
+            notify_task_change(
+                db,
+                task_id=task_id,
+                action_label="Tarea enviada a testing",
+                actor_name=user["username"],
+                extra_text=f"Comentario nuevo:\n{comment_body}" if comment_body else "",
+                extra_html=(
+                    f"<p><strong>Comentario nuevo:</strong><br>{escape(comment_body).replace(chr(10), '<br>')}</p>"
+                    if comment_body
+                    else ""
+                ),
+            )
         return jsonify(fetch_task(db, task_id))
 
 
